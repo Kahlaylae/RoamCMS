@@ -239,6 +239,220 @@
     .table-wrapper { margin: 10px 8px; }
     td[contenteditable] { max-width: 180px; }
   }
+
+  /* ── In-App Search Bar ─────────────────────────── */
+  .search-wrap {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,0,0,0.2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; transition: border-color 0.15s;
+  }
+  .search-wrap:focus-within { border-color: var(--accent); }
+  .search-wrap input {
+    background: none; border: none; color: var(--text);
+    font-size: 0.82rem; outline: none; width: 160px; padding: 4px 0;
+  }
+  .search-wrap input::placeholder { color: var(--text-muted); }
+  .search-wrap .search-hint {
+    font-size: 0.65rem; color: var(--text-muted);
+    background: var(--surface); padding: 2px 6px; border-radius: 3px;
+    white-space: nowrap;
+  }
+  .search-count { font-size: 0.75rem; color: var(--accent); white-space: nowrap; }
+
+  /* ── Image Cell ────────────────────────────────── */
+  .image-cell-wrap {
+    display: flex; align-items: center; gap: 4px; min-width: 140px;
+  }
+  .image-cell-input {
+    flex: 1; min-width: 60px; background: none; border: none;
+    color: var(--text); font-size: 0.82rem; outline: none;
+    padding: 3px 4px; border-radius: 3px;
+  }
+  .image-cell-input:focus { background: rgba(137, 180, 250, 0.12); }
+  .image-cell-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.75rem;
+    white-space: nowrap; transition: all 0.15s;
+  }
+  .image-cell-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Image Picker Dropdown ─────────────────────── */
+  .image-picker-panel {
+    position: fixed; z-index: 300; background: var(--surface);
+    border: 1px solid var(--accent); border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6); display: none;
+    width: 320px; max-height: 360px; flex-direction: column;
+  }
+  .image-picker-panel.visible { display: flex; }
+  .image-picker-header {
+    padding: 8px 10px; border-bottom: 1px solid var(--border);
+  }
+  .image-picker-header input {
+    width: 100%; padding: 6px 10px; border-radius: 5px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); font-size: 0.82rem; outline: none;
+  }
+  .image-picker-header input:focus { border-color: var(--accent); }
+  .image-picker-list {
+    flex: 1; overflow-y: auto; padding: 4px 0;
+  }
+  .image-picker-item {
+    padding: 8px 12px; cursor: pointer; font-size: 0.8rem;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid rgba(58,58,85,0.3); transition: background 0.1s;
+  }
+  .image-picker-item:hover, .image-picker-item.active {
+    background: rgba(137, 180, 250, 0.12);
+  }
+  .image-picker-item .thumb {
+    width: 32px; height: 32px; border-radius: 4px; object-fit: cover;
+    background: var(--border); flex-shrink: 0;
+  }
+  .image-picker-item .img-name { flex: 1; word-break: break-all; }
+  .image-picker-empty {
+    padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.8rem;
+  }
+  .image-picker-close {
+    position: absolute; top: 6px; right: 10px; background: none;
+    border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 1rem; padding: 2px 6px;
+  }
+  .image-picker-close:hover { color: var(--danger); }
+
+  /* ── Auto-Match Modal ──────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 400;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); width: 90%; max-width: 700px;
+    max-height: 80vh; display: flex; flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  .modal-header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-header h3 { font-size: 1rem; margin: 0; }
+  .modal-header h3 span { color: var(--accent); }
+  .modal-close {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1.3rem; padding: 0 4px;
+  }
+  .modal-close:hover { color: var(--danger); }
+  .modal-body {
+    flex: 1; overflow-y: auto; padding: 12px 20px;
+  }
+  .modal-footer {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+  .match-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid rgba(58,58,85,0.3);
+  }
+  .match-row:last-child { border-bottom: none; }
+  .match-title { flex: 1; font-size: 0.85rem; min-width: 120px; }
+  .match-arrow { color: var(--accent); font-size: 0.85rem; }
+  .match-select {
+    flex: 2; padding: 6px 8px; border-radius: 4px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); font-size: 0.8rem; outline: none;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .match-select:focus { border-color: var(--accent); }
+  .match-select.matched { border-color: var(--success); }
+  .match-select.unmatched { border-color: var(--warning); }
+  .match-preview {
+    width: 28px; height: 28px; border-radius: 3px; object-fit: cover;
+    background: var(--border); flex-shrink: 0;
+  }
+  .match-badge {
+    font-size: 0.65rem; padding: 2px 8px; border-radius: 10px;
+    white-space: nowrap; font-weight: 600;
+  }
+  .match-badge.auto { background: rgba(137, 180, 250, 0.2); color: var(--accent); }
+  .match-badge.confirmed { background: rgba(166, 227, 161, 0.2); color: var(--success); }
+  .match-badge.manual { background: rgba(249, 226, 175, 0.2); color: var(--warning); }
+
+  /* Match status bar */
+  .match-stats {
+    display: flex; gap: 12px; padding: 8px 20px;
+    font-size: 0.78rem; color: var(--text-muted);
+    background: rgba(0,0,0,0.1); border-bottom: 1px solid var(--border);
+  }
+  .match-stats strong { color: var(--text); }
+
+  /* ── Tag Monitor Panel ────────────────────────── */
+  .tag-monitor {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 250;
+    background: var(--surface); border-top: 2px solid var(--accent);
+    height: 200px; min-height: 80px; max-height: 60vh;
+    display: none; flex-direction: column;
+  }
+  .tag-monitor.visible { display: flex; }
+  .tag-monitor-resize {
+    position: absolute; top: -8px; left: 0; right: 0; height: 12px;
+    cursor: ns-resize; z-index: 10;
+  }
+  .tag-monitor-resize::after {
+    content: ''; position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 4px; border-radius: 2px;
+    background: var(--border); transition: background 0.15s;
+  }
+  .tag-monitor-resize:hover::after { background: var(--accent); }
+  .tag-monitor-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .tag-monitor-header h3 { font-size: 0.85rem; margin: 0; white-space: nowrap; }
+  .tag-monitor-header h3 span { color: var(--accent); }
+  .tag-monitor-search {
+    flex: 1; padding: 5px 10px; border-radius: 5px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); font-size: 0.8rem; outline: none;
+  }
+  .tag-monitor-search:focus { border-color: var(--accent); }
+  .tag-monitor-close {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1.1rem; padding: 2px 6px;
+  }
+  .tag-monitor-close:hover { color: var(--danger); }
+  .tag-monitor-list {
+    flex: 1; overflow-y: auto; padding: 8px 12px;
+    display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start;
+  }
+  .tag-chip {
+    padding: 5px 12px; border-radius: 14px; cursor: pointer;
+    font-size: 0.78rem; font-weight: 500;
+    background: rgba(137, 180, 250, 0.1);
+    border: 1px solid rgba(137, 180, 250, 0.25);
+    color: var(--text); transition: all 0.15s;
+    user-select: none; white-space: nowrap;
+  }
+  .tag-chip:hover {
+    background: rgba(137, 180, 250, 0.2);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .tag-chip .tag-count {
+    font-size: 0.68rem; color: var(--text-muted);
+    margin-left: 2px;
+  }
+  .tag-chip.hot { background: rgba(166, 227, 161, 0.15); border-color: rgba(166, 227, 161, 0.35); }
+  .tag-chip.hot .tag-count { color: var(--success); }
+  body.has-tag-monitor { padding-bottom: 220px; }
+
+  /* ── Edit Lock ────────────────────────────────── */
+  td[contenteditable="false"] { cursor: default; }
+  tr.row-selected td { background: rgba(137, 180, 250, 0.06) !important; }
+  tr.row-selected td[contenteditable="false"]:hover { background: rgba(137, 180, 250, 0.1) !important; }
+  .btn.lock-btn { font-weight: 600; min-width: 100px; }
+  .btn.lock-btn.locked { color: var(--warning); border-color: var(--warning); }
+  .btn.lock-btn.unlocked { color: var(--success); border-color: var(--success); }
 </style>
 </head>
 <body>
@@ -246,9 +460,17 @@
   <h1>📊 JSON <span>Table Editor</span></h1>
   <div class="file-tabs" id="fileTabs"></div>
   <div class="toolbar">
+    <div class="search-wrap" id="searchWrap" style="display:none">
+      <span>🔍</span>
+      <input type="text" id="searchInput" placeholder="Filter rows…" oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+      <span class="search-hint">Ctrl+F</span>
+      <span class="search-count" id="searchCount"></span>
+    </div>
     <button class="btn primary" onclick="addRow()" title="Add a new row (Ctrl+N)">＋ Add Row</button>
     <button class="btn" onclick="saveData()" title="Save changes to disk (Ctrl+S)">💾 Save</button>
+    <button class="btn lock-btn locked" id="lockBtn" onclick="toggleEditLock()" title="Toggle cell editing — double-click any cell to edit it">🔒 Locked</button>
     <button class="btn" onclick="exportCSV()" title="Download as CSV">📥 CSV</button>
+    <button class="btn" id="autoMatchBtn" onclick="openAutoMatch()" title="Auto-match places to images" style="display:none">🖼 Auto-Match</button>
     <button class="btn danger" onclick="confirmDeleteSelected()" title="Delete selected rows">🗑 Delete</button>
   </div>
 </header>
@@ -293,6 +515,42 @@
 <!-- Auto-Complete Dropdown -->
 <div class="autocomplete-popup" id="autocompletePopup"></div>
 
+<!-- Image Picker Panel -->
+<div class="image-picker-panel" id="imagePicker">
+  <button class="image-picker-close" onclick="closeImagePicker()" title="Close">✕</button>
+  <div class="image-picker-header">
+    <input type="text" id="imagePickerSearch" placeholder="Search images…" oninput="filterImagePicker()" onkeydown="onImagePickerKeydown(event)">
+  </div>
+  <div class="image-picker-list" id="imagePickerList"></div>
+</div>
+
+<!-- Auto-Match Modal -->
+<div class="modal-overlay" id="autoMatchOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🖼 Auto-Match <span>Place → Image</span></h3>
+      <button class="modal-close" onclick="closeAutoMatch()">✕</button>
+    </div>
+    <div class="match-stats" id="matchStats"></div>
+    <div class="modal-body" id="autoMatchBody"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAutoMatch()">Cancel</button>
+      <button class="btn primary" onclick="applyAutoMatches()">✅ Apply & Save Matches</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tag Monitor Panel -->
+<div class="tag-monitor" id="tagMonitor">
+  <div class="tag-monitor-resize" id="tagMonitorResize" title="Drag to resize"></div>
+  <div class="tag-monitor-header">
+    <h3>🏷️ Tag <span>Monitor</span></h3>
+    <input class="tag-monitor-search" id="tagMonitorSearch" placeholder="Filter tags…" oninput="filterTagMonitor()">
+    <button class="tag-monitor-close" onclick="hideTagMonitor()" title="Close">✕</button>
+  </div>
+  <div class="tag-monitor-list" id="tagMonitorList"></div>
+</div>
+
 <script>
 let currentFile = null;
 let currentData = [];
@@ -300,6 +558,8 @@ let originalData = null;
 let isDirty = false;
 let lookupData = {};
 let allKeys = [];
+let placesMeta = { labels: [], tags: [] };
+let editLocked = true; // start locked to prevent accidental edits
 
 const linkedColumns = {
   'events.json': {
@@ -349,6 +609,13 @@ async function selectFile(filename) {
     currentData = await resp.json();
     originalData = JSON.parse(JSON.stringify(currentData));
     isDirty = false;
+    // Load label/tag metadata for places.json
+    if (filename === 'places.json') {
+      try {
+        const metaResp = await fetch('/api/places-meta');
+        if (metaResp.ok) placesMeta = await metaResp.json();
+      } catch (_) { placesMeta = { labels: [], tags: [] }; }
+    }
     await loadLookupData(filename);
     renderTable();
     setStatus('saved', currentData.length + ' rows loaded');
@@ -444,6 +711,35 @@ function renderCell(key, row, idx, fileLinks) {
   const strVal = (typeof rawVal === 'object') ? JSON.stringify(rawVal) : String(rawVal);
   const escVal = escapeHtml(strVal);
   const linkCfg = fileLinks[key];
+
+  // ── Label field in places.json: single-select dropdown ──
+  if (currentFile === 'places.json' && key === 'label') {
+    const options = (placesMeta.labels || []).map(l =>
+      '<option value="' + escapeHtml(l) + '"' + (strVal === l ? ' selected' : '') + '>' + escapeHtml(l) + '</option>'
+    );
+    return '<td class="dropdown-cell" data-key="label" data-index="' + idx + '">' +
+      '<select data-key="label" data-index="' + idx + '">' +
+      '<option value="">—</option>' + options.join('') + '</select></td>';
+  }
+
+  // ── Tags field: free text + tag monitor panel at bottom ──
+  if (currentFile === 'places.json' && key === 'tags') {
+    const lockAttr = editLocked ? ' contenteditable="false"' : ' contenteditable="true"';
+    return '<td' + lockAttr + ' data-key="tags" data-index="' + idx + '" data-original="' + escVal + '" class="tags-free-cell" ondblclick="unlockCell(this)">' + escVal + '</td>';
+  }
+
+  // ── Image field in places.json: searchable input + dropdown button ──
+  if (currentFile === 'places.json' && key === 'image') {
+    return '<td class="image-cell-td" data-key="image" data-index="' + idx + '">' +
+      '<div class="image-cell-wrap">' +
+        '<input class="image-cell-input" type="text" value="' + escVal + '" ' +
+          'data-key="image" data-index="' + idx + '" ' +
+          'onfocus="openImagePicker(this)" oninput="onImageCellInput(this)" ' +
+          'onkeydown="onImageCellKeydown(event, this)" placeholder="(no image)">' +
+        '<button class="image-cell-btn" onclick="openImagePicker(this.previousElementSibling)" title="Browse images">📁</button>' +
+      '</div></td>';
+  }
+
   if (linkCfg) {
     const lookupRows = lookupData[linkCfg.lookupFile] || [];
     const options = lookupRows.map(r => {
@@ -471,7 +767,8 @@ function renderCell(key, row, idx, fileLinks) {
         escapeHtml(preview) +
       '</div></td>';
   }
-  return '<td contenteditable="true" data-key="' + escapeHtml(key) + '" data-index="' + idx + '" data-original="' + escVal + '">' + escVal + '</td>';
+  const lockAttr = editLocked ? ' contenteditable="false"' : ' contenteditable="true"';
+  return '<td' + lockAttr + ' data-key="' + escapeHtml(key) + '" data-index="' + idx + '" data-original="' + escVal + '" ondblclick="unlockCell(this)">' + escVal + '</td>';
 }
 
 function onDropdownChange(e) {
@@ -1071,6 +1368,9 @@ function exportCSV() {
 }
 
 document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    if (currentFile && currentData.length > 0) { e.preventDefault(); showSearchBar(); }
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveData(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); addRow(); }
 });
@@ -1096,6 +1396,566 @@ function updateStatusDot() {
 window.addEventListener('beforeunload', e => {
   if (isDirty) e.preventDefault();
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  EDIT LOCK — prevent accidental cell edits
+// ═══════════════════════════════════════════════════════════════
+function toggleEditLock() {
+  editLocked = !editLocked;
+  const btn = document.getElementById('lockBtn');
+  if (editLocked) {
+    btn.textContent = '🔒 Locked';
+    btn.className = 'btn lock-btn locked';
+    btn.title = 'Editing locked — double-click any cell to edit it';
+  } else {
+    btn.textContent = '🔓 Unlocked';
+    btn.className = 'btn lock-btn unlocked';
+    btn.title = 'Editing unlocked — click the button to lock again';
+  }
+  // Update all contenteditable cells
+  document.querySelectorAll('td[contenteditable]').forEach(td => {
+    td.contentEditable = editLocked ? 'false' : 'true';
+  });
+  if (!editLocked) {
+    setStatus('unsaved', '⚠ Editing unlocked — cells are now editable');
+  } else {
+    setStatus('saved', '🔒 Editing locked');
+  }
+}
+
+function unlockCell(td) {
+  // Double-click: temporarily unlock this cell for editing
+  td.contentEditable = 'true';
+  td.focus();
+  // Select all text in the cell for quick replacement
+  const range = document.createRange();
+  range.selectNodeContents(td);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  // Track that we modified this cell outside lock
+  isDirty = true;
+  updateStatusDot();
+}
+
+// Re-lock cells when they lose focus (if global lock is on)
+document.addEventListener('focusout', function(e) {
+  if (!editLocked) return;
+  const td = e.target.closest('td[contenteditable]');
+  if (td) {
+    // Small delay to allow click events on tag chips etc.
+    setTimeout(() => {
+      if (document.activeElement !== td) {
+        td.contentEditable = 'false';
+      }
+    }, 200);
+  }
+});
+
+// Row selection tracking for tag monitor targeting
+let selectedRowIdx = -1;
+document.addEventListener('click', function(e) {
+  // Track row clicks for selection
+  const tr = e.target.closest('tr[id^=\"row-\"]');
+  if (tr) {
+    document.querySelectorAll('tr.row-selected').forEach(r => r.classList.remove('row-selected'));
+    tr.classList.add('row-selected');
+    selectedRowIdx = parseInt(tr.dataset.index);
+    tagMonitorActiveRow = selectedRowIdx;
+  }
+  // Track tag cell clicks specifically
+  const td = e.target.closest('td.tags-free-cell');
+  if (td) tagMonitorActiveRow = parseInt(td.dataset.index);
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  TAG MONITOR RESIZE — drag to change height
+// ═══════════════════════════════════════════════════════════════
+(function() {
+  let resizeActive = false, resizeStartY = 0, resizeStartH = 0;
+  const panel = document.getElementById('tagMonitor');
+  const handle = document.getElementById('tagMonitorResize');
+
+  handle.addEventListener('mousedown', function(e) {
+    resizeActive = true;
+    resizeStartY = e.clientY;
+    resizeStartH = panel.offsetHeight;
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!resizeActive) return;
+    const dy = resizeStartY - e.clientY;
+    const newH = Math.max(80, Math.min(window.innerHeight * 0.6, resizeStartH + dy));
+    panel.style.height = newH + 'px';
+    document.body.style.paddingBottom = (newH + 50) + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (resizeActive) {
+      resizeActive = false;
+      document.body.style.userSelect = '';
+    }
+  });
+})();
+
+// ═══════════════════════════════════════════════════════════════
+//  TAG MONITOR — bottom panel showing all tags with usage counts
+// ═══════════════════════════════════════════════════════════════
+let tagCounts = {}; // tag → count
+let tagMonitorActiveRow = -1;
+
+function buildTagCounts() {
+  tagCounts = {};
+  if (currentFile !== 'places.json' || !currentData.length) return;
+  for (const row of currentData) {
+    const raw = (row.tags || '').toString();
+    if (!raw.trim()) continue;
+    for (const t of raw.split(',')) {
+      const tag = t.trim().toLowerCase();
+      if (tag) tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    }
+  }
+}
+
+function renderTagMonitor() {
+  buildTagCounts();
+  const list = document.getElementById('tagMonitorList');
+  const sorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) {
+    list.innerHTML = '<span style="color:var(--text-muted);padding:8px">No tags yet — add some in the Tags column above.</span>';
+    return;
+  }
+  const maxCount = sorted[0][1];
+  list.innerHTML = sorted.map(([tag, count]) => {
+    const hot = count >= maxCount * 0.3 ? ' hot' : '';
+    return '<span class="tag-chip' + hot + '" onclick="insertTag(\'' + escapeHtml(tag).replace(/'/g, "\\'") + '\')" title="Used in ' + count + ' place(s)">' +
+      escapeHtml(tag) + '<span class="tag-count">' + count + '</span></span>';
+  }).join('');
+}
+
+function showTagMonitor() {
+  if (currentFile !== 'places.json') return;
+  const panel = document.getElementById('tagMonitor');
+  panel.classList.add('visible');
+  document.body.classList.add('has-tag-monitor');
+  document.getElementById('tagMonitorSearch').value = '';
+  renderTagMonitor();
+}
+
+function hideTagMonitor() {
+  document.getElementById('tagMonitor').classList.remove('visible');
+  document.body.classList.remove('has-tag-monitor');
+}
+
+function filterTagMonitor() {
+  const q = document.getElementById('tagMonitorSearch').value.toLowerCase().trim();
+  const chips = document.querySelectorAll('#tagMonitorList .tag-chip');
+  chips.forEach(chip => {
+    chip.style.display = (!q || chip.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
+
+function insertTag(tag) {
+  // Find the currently focused/active tags cell, or last clicked row
+  let targetTd = document.activeElement;
+  if (!targetTd || !targetTd.classList.contains('tags-free-cell')) {
+    // Try the last known row
+    if (tagMonitorActiveRow >= 0) {
+      targetTd = document.querySelector('td.tags-free-cell[data-index="' + tagMonitorActiveRow + '"]');
+    }
+    if (!targetTd) {
+      // Fall back to first visible tags cell
+      targetTd = document.querySelector('td.tags-free-cell');
+    }
+  }
+  if (!targetTd) return;
+
+  const idx = parseInt(targetTd.dataset.index);
+  let current = currentData[idx].tags || '';
+  const existing = current.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  if (existing.includes(tag)) return; // already there
+
+  if (current.trim()) current += ', ';
+  current += tag;
+  currentData[idx].tags = current;
+  targetTd.textContent = current;
+  isDirty = true;
+  updateStatusDot();
+  setStatus('unsaved', 'Tag "' + tag + '" added to row ' + (idx + 1));
+
+  // Update count
+  buildTagCounts();
+  // Refresh the chip display (update count on the chip)
+  const chips = document.querySelectorAll('#tagMonitorList .tag-chip');
+  chips.forEach(chip => {
+    const chipTag = chip.childNodes[0]?.textContent?.trim();
+    if (chipTag === tag) {
+      const countEl = chip.querySelector('.tag-count');
+      if (countEl) countEl.textContent = tagCounts[tag] || 0;
+    }
+  });
+}
+
+// Track which row was last clicked in the tags column
+document.addEventListener('click', function(e) {
+  const td = e.target.closest('td.tags-free-cell');
+  if (td) tagMonitorActiveRow = parseInt(td.dataset.index);
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  IMAGE PICKER — searchable dropdown for /images/ directory
+// ═══════════════════════════════════════════════════════════════
+let imagePickerTarget = null;
+let allImages = [];
+
+async function loadImageList() {
+  if (allImages.length > 0) return allImages;
+  try {
+    const resp = await fetch('/api/images');
+    allImages = await resp.json();
+  } catch (_) { allImages = []; }
+  return allImages;
+}
+
+function openImagePicker(inputEl) {
+  imagePickerTarget = inputEl;
+  const panel = document.getElementById('imagePicker');
+  const searchInput = document.getElementById('imagePickerSearch');
+  searchInput.value = '';
+  // Position near the input
+  const rect = inputEl.getBoundingClientRect();
+  panel.style.left = Math.min(rect.left, window.innerWidth - 340) + 'px';
+  panel.style.top = Math.min(rect.bottom + 4, window.innerHeight - 380) + 'px';
+  loadImageList().then(() => filterImagePicker());
+  panel.classList.add('visible');
+  setTimeout(() => searchInput.focus(), 50);
+}
+
+function closeImagePicker() {
+  document.getElementById('imagePicker').classList.remove('visible');
+  imagePickerTarget = null;
+}
+
+function filterImagePicker() {
+  const q = document.getElementById('imagePickerSearch').value.toLowerCase();
+  const list = document.getElementById('imagePickerList');
+  const filtered = allImages.filter(img => img.toLowerCase().includes(q));
+  if (!filtered.length) {
+    list.innerHTML = '<div class="image-picker-empty">No images match "' + escapeHtml(q) + '"</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(img =>
+    '<div class="image-picker-item" onclick="selectImage(\'' + escapeHtml(img).replace(/'/g, "\\'") + '\')" title="' + escapeHtml(img) + '">' +
+      '<img class="thumb" src="/images/' + escapeHtml(img) + '" onerror="this.style.display=\'none\'" loading="lazy">' +
+      '<span class="img-name">' + escapeHtml(img) + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+function onImagePickerKeydown(e) {
+  const panel = document.getElementById('imagePicker');
+  if (!panel.classList.contains('visible')) return;
+  if (e.key === 'Escape') { closeImagePicker(); return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); navigateImagePicker(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); navigateImagePicker(-1); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    const active = panel.querySelector('.image-picker-item.active');
+    if (active) active.click();
+  }
+}
+
+function navigateImagePicker(dir) {
+  const items = document.getElementById('imagePickerList').querySelectorAll('.image-picker-item');
+  if (!items.length) return;
+  let activeIdx = -1;
+  items.forEach((it, i) => { if (it.classList.contains('active')) activeIdx = i; });
+  items.forEach(it => it.classList.remove('active'));
+  activeIdx = Math.max(0, Math.min(items.length - 1, activeIdx + dir));
+  items[activeIdx].classList.add('active');
+  items[activeIdx].scrollIntoView({ block: 'nearest' });
+}
+
+function selectImage(filename) {
+  if (imagePickerTarget) {
+    imagePickerTarget.value = filename;
+    onImageCellInput(imagePickerTarget);
+  }
+  closeImagePicker();
+}
+
+function onImageCellInput(inputEl) {
+  const idx = parseInt(inputEl.dataset.index);
+  const key = inputEl.dataset.key;
+  currentData[idx][key] = inputEl.value;
+  isDirty = true;
+  updateStatusDot();
+  setStatus('unsaved', 'Image updated');
+}
+
+function onImageCellKeydown(e, inputEl) {
+  if (e.key === 'Escape') { closeImagePicker(); return; }
+  if (e.key === 'ArrowDown') {
+    // Open picker if not already open
+    const panel = document.getElementById('imagePicker');
+    if (!panel.classList.contains('visible') || imagePickerTarget !== inputEl) {
+      openImagePicker(inputEl);
+    }
+    e.preventDefault();
+    navigateImagePicker(1);
+  }
+}
+
+// Close image picker on outside click
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('imagePicker');
+  if (!panel.classList.contains('visible')) return;
+  if (!e.target.closest('#imagePicker') && !e.target.closest('.image-cell-btn') && !e.target.closest('.image-cell-input')) {
+    closeImagePicker();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTO-MATCH — match places to images by first 7 chars
+// ═══════════════════════════════════════════════════════════════
+let autoMatchData = {}; // title → { filename, source: 'auto'|'confirmed'|'manual' }
+
+async function openAutoMatch() {
+  if (!currentData.length) return;
+  document.getElementById('autoMatchOverlay').classList.add('visible');
+
+  // Get titles from current data
+  const titles = currentData.map(r => r.title || '').filter(Boolean);
+
+  // Fetch auto-matches from server
+  try {
+    const resp = await fetch('/api/auto-match-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titles }),
+    });
+    const data = await resp.json();
+    autoMatchData = {};
+
+    // Also load confirmed matches
+    const mResp = await fetch('/api/image-matches');
+    const confirmed = await mResp.json();
+
+    for (const title of titles) {
+      const currentImg = (currentData.find(r => r.title === title) || {}).image || '';
+      const autoImg = data.matches[title] || '';
+      const confirmedImg = confirmed[title] || '';
+
+      let source = 'none';
+      let suggestedImg = currentImg || '';
+
+      if (confirmedImg) {
+        source = 'confirmed';
+        suggestedImg = confirmedImg;
+      } else if (autoImg && !currentImg) {
+        source = 'auto';
+        suggestedImg = autoImg;
+      } else if (autoImg && currentImg !== autoImg) {
+        source = 'auto';
+        suggestedImg = autoImg;
+      } else if (currentImg) {
+        source = 'manual';
+        suggestedImg = currentImg;
+      }
+
+      autoMatchData[title] = {
+        filename: suggestedImg,
+        source: source,
+        originalImage: currentImg,
+      };
+    }
+
+    renderAutoMatchModal();
+  } catch (err) {
+    document.getElementById('autoMatchBody').innerHTML =
+      '<p style="color:var(--danger);padding:20px">Failed to load matches: ' + escapeHtml(err.message) + '</p>';
+  }
+}
+
+function closeAutoMatch() {
+  document.getElementById('autoMatchOverlay').classList.remove('visible');
+  autoMatchData = {};
+}
+
+async function renderAutoMatchModal() {
+  const body = document.getElementById('autoMatchBody');
+  const images = await loadImageList();
+  const entries = Object.entries(autoMatchData);
+
+  // Stats
+  let autoCount = 0, confirmedCount = 0, emptyCount = 0;
+  entries.forEach(([_, v]) => {
+    if (v.source === 'confirmed') confirmedCount++;
+    else if (v.source === 'auto') autoCount++;
+    if (!v.originalImage && !v.filename) emptyCount++;
+  });
+  document.getElementById('matchStats').innerHTML =
+    '<span>🔁 <strong>' + autoCount + '</strong> auto-suggested</span>' +
+    '<span>✅ <strong>' + confirmedCount + '</strong> confirmed</span>' +
+    '<span>📭 <strong>' + emptyCount + '</strong> still empty</span>';
+
+  // Build image options <option> list
+  const imgOptions = images.map(img =>
+    '<option value="' + escapeHtml(img) + '">' + escapeHtml(img) + '</option>'
+  ).join('');
+
+  body.innerHTML = entries.map(([title, info]) => {
+    const badgeClass = info.source === 'confirmed' ? 'confirmed' :
+                       info.source === 'auto' ? 'auto' : 'manual';
+    const badgeText = info.source === 'confirmed' ? '✓ confirmed' :
+                      info.source === 'auto' ? '⟳ suggested' : '✎ manual';
+    const selectClass = info.source === 'confirmed' ? 'matched' :
+                        info.source === 'auto' && info.filename ? 'matched' :
+                        !info.filename ? 'unmatched' : '';
+    const previewSrc = info.filename ? '/images/' + info.filename : '';
+
+    return '<div class="match-row">' +
+      '<span class="match-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
+      '<span class="match-badge ' + badgeClass + '">' + badgeText + '</span>' +
+      '<span class="match-arrow">→</span>' +
+      (previewSrc ? '<img class="match-preview" src="' + previewSrc + '" onerror="this.style.display=\'none\'" loading="lazy">' : '<span style="width:28px"></span>') +
+      '<select class="match-select ' + selectClass + '" data-title="' + escapeHtml(title).replace(/"/g, '&quot;') + '" onchange="onMatchSelectChange(this)">' +
+        '<option value="">— no image —</option>' +
+        imgOptions.replace('value="' + escapeHtml(info.filename) + '"', 'value="' + escapeHtml(info.filename) + '" selected') +
+      '</select>' +
+    '</div>';
+  }).join('');
+
+  if (!entries.length) {
+    body.innerHTML = '<p style="padding:20px;color:var(--text-muted)">No places found with titles to match.</p>';
+  }
+}
+
+function onMatchSelectChange(selectEl) {
+  const title = selectEl.dataset.title;
+  const newVal = selectEl.value;
+  if (autoMatchData[title]) {
+    autoMatchData[title].filename = newVal;
+    autoMatchData[title].source = 'manual';
+    selectEl.className = 'match-select' + (newVal ? ' matched' : ' unmatched');
+    // Update badge
+    const row = selectEl.closest('.match-row');
+    const badge = row.querySelector('.match-badge');
+    badge.className = 'match-badge manual';
+    badge.textContent = '✎ manual';
+    // Update preview
+    const preview = row.querySelector('.match-preview');
+    if (preview) preview.src = newVal ? '/images/' + newVal : '';
+  }
+}
+
+async function applyAutoMatches() {
+  const newConfirmed = {};
+  let appliedCount = 0;
+
+  for (const [title, info] of Object.entries(autoMatchData)) {
+    if (info.filename && info.source !== 'confirmed') {
+      newConfirmed[title] = info.filename;
+    }
+    // Apply to current data
+    const row = currentData.find(r => r.title === title);
+    if (row && info.filename && row.image !== info.filename) {
+      row.image = info.filename;
+      appliedCount++;
+    }
+  }
+
+  // Save confirmed matches to server
+  if (Object.keys(newConfirmed).length > 0) {
+    try {
+      await fetch('/api/image-matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfirmed),
+      });
+    } catch (_) {}
+  }
+
+  if (appliedCount > 0) {
+    isDirty = true;
+    renderTable();
+    setStatus('unsaved', appliedCount + ' image(s) auto-matched — save to persist');
+  }
+
+  closeAutoMatch();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  IN-APP SEARCH — filter table rows in real-time
+// ═══════════════════════════════════════════════════════════════
+
+function showSearchBar() {
+  const wrap = document.getElementById('searchWrap');
+  wrap.style.display = 'flex';
+  document.getElementById('searchInput').focus();
+  document.getElementById('searchInput').select();
+}
+
+function onSearchInput() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const countEl = document.getElementById('searchCount');
+  let visibleCount = 0;
+
+  if (!q) {
+    // Show all rows
+    document.querySelectorAll('#tableBody tr').forEach(tr => {
+      tr.style.display = '';
+    });
+    countEl.textContent = '';
+    return;
+  }
+
+  document.querySelectorAll('#tableBody tr').forEach(tr => {
+    const text = tr.textContent.toLowerCase();
+    if (text.includes(q)) {
+      tr.style.display = '';
+      visibleCount++;
+    } else {
+      tr.style.display = 'none';
+    }
+  });
+
+  const total = currentData.length;
+  countEl.textContent = visibleCount + '/' + total;
+}
+
+function onSearchKeydown(e) {
+  if (e.key === 'Escape') {
+    document.getElementById('searchInput').value = '';
+    onSearchInput();
+    document.getElementById('searchWrap').style.display = 'none';
+    // Refocus table
+    const firstCell = document.querySelector('td[contenteditable], td.image-cell-td input');
+    if (firstCell) firstCell.focus();
+  }
+}
+
+// Ctrl+F → custom in-app search (already handled in main keyboard listener above)
+
+// Show/hide auto-match button, search bar, and tag monitor — hooked after renderTable
+const _origRenderTable = renderTable;
+renderTable = function() {
+  _origRenderTable();
+  // File-specific toolbar updates
+  const btn = document.getElementById('autoMatchBtn');
+  if (btn) btn.style.display = (currentFile === 'places.json') ? '' : 'none';
+  document.getElementById('searchWrap').style.display = 'none';
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchCount').textContent = '';
+  // Tag monitor for places.json
+  if (currentFile === 'places.json') {
+    showTagMonitor();
+  } else {
+    hideTagMonitor();
+  }
+};
 </script>
 </body>
 </html>

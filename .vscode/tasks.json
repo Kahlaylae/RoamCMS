@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Open JSON Editor",
+      "type": "shell",
+      "command": "python3 server.py & sleep 1 && open http://localhost:5050 && wait",
+      "options": { "cwd": "/Users/kayboy/Documents/ROAMCMS" },
+      "problemMatcher": [],
+      "isBackground": true
+    }
+  ]
+}

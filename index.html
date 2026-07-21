@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Table Editor</title>
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --surface: #282840;
+    --border: #3a3a55;
+    --text: #cdd6f4;
+    --text-muted: #9399b2;
+    --accent: #89b4fa;
+    --accent-hover: #74c7ec;
+    --danger: #f38ba8;
+    --danger-hover: #e06c88;
+    --success: #a6e3a1;
+    --warning: #f9e2af;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: 1.3rem; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  .file-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .file-tab {
+    padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-muted); cursor: pointer;
+    font-size: 0.85rem; transition: all 0.15s;
+  }
+  .file-tab:hover { color: var(--text); border-color: var(--accent); }
+  .file-tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); cursor: pointer;
+    font-size: 0.85rem; font-weight: 500; transition: all 0.15s; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover { background: var(--danger); color: var(--bg); border-color: var(--danger); }
+  .status-bar {
+    display: flex; align-items: center; gap: 10px; padding: 8px 24px;
+    font-size: 0.8rem; color: var(--text-muted); background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+  .status-dot.saved { background: var(--success); }
+  .status-dot.unsaved { background: var(--warning); animation: pulse 1.5s infinite; }
+  .status-dot.error { background: var(--danger); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .table-wrapper {
+    margin: 16px 24px; overflow-x: auto; border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 600px; }
+  thead { background: var(--surface); position: sticky; top: 0; z-index: 2; }
+  th {
+    padding: 10px 12px; text-align: left; font-weight: 600;
+    color: var(--text-muted); border-bottom: 2px solid var(--border);
+    white-space: nowrap; user-select: none;
+  }
+  th.col-actions { width: 90px; text-align: center; }
+  th.col-num { width: 44px; }
+  th.col-check { width: 40px; text-align: center; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--accent); }
+  th.sortable .sort-arrow { color: var(--accent); font-size: 0.7rem; margin-left: 2px; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td[contenteditable] {
+    cursor: text; outline: none; border-radius: 3px; transition: background 0.1s;
+    min-width: 60px; max-width: 350px; overflow: hidden; text-overflow: ellipsis;
+  }
+  td[contenteditable]:hover { background: rgba(137, 180, 250, 0.08); }
+  td[contenteditable]:focus {
+    background: rgba(137, 180, 250, 0.15);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    overflow: visible; white-space: pre-wrap; word-break: break-all; max-width: none;
+  }
+  td.dropdown-cell { padding: 2px 4px; }
+  td.dropdown-cell select {
+    width: 100%; min-width: 120px; padding: 5px 8px; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-size: 0.82rem; cursor: pointer; outline: none;
+  }
+  td.dropdown-cell select:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent);
+  }
+  tr.paste-highlight td { animation: pasteFlash 0.6s ease-out; }
+  @keyframes pasteFlash { from { background: rgba(137, 180, 250, 0.3); } to { background: transparent; } }
+
+  /* Description Syntax Highlighting */
+  .desc-display {
+    white-space: pre-wrap; word-break: break-word;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem;
+    line-height: 1.5; padding: 10px 12px; cursor: pointer;
+    border-radius: 4px; min-height: 80px; max-height: 300px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.15);
+    max-width: 550px;
+  }
+
+  .desc-cell {
+    min-width: 380px; max-width: 550px;
+  }
+  .desc-cell-inner {
+    height: 80px; overflow: hidden;
+    white-space: pre-wrap; word-break: break-word;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem;
+    line-height: 1.4; padding: 6px 8px; cursor: pointer;
+    border-radius: 4px; background: rgba(0,0,0,0.12);
+    color: var(--text-muted); position: relative;
+    transition: background 0.15s;
+  }
+  .desc-cell-inner:hover { background: rgba(137, 180, 250, 0.08); }
+  .desc-cell-inner::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 20px; background: linear-gradient(transparent, rgba(30,30,46,0.9));
+  }
+  .desc-cell-inner.active {
+    background: rgba(137, 180, 250, 0.12);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    color: var(--text);
+  }
+  tr.desc-active td { background: rgba(137, 180, 250, 0.04); }
+
+  /* Bottom Editing Bar */
+  .desc-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+    background: var(--surface); border-top: 2px solid var(--accent);
+    padding: 12px 24px; display: flex; gap: 12px; align-items: flex-start;
+    max-height: 50vh; min-height: 120px;
+  }
+  .desc-bar.hidden { display: none; }
+  .desc-bar-left { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .desc-bar-right { width: 380px; flex-shrink: 0; display: flex; flex-direction: column; }
+  .desc-bar-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    font-size: 0.75rem; color: var(--text-muted);
+  }
+  .desc-bar-header strong { color: var(--accent); }
+  .desc-bar-close {
+    margin-left: auto; background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1.2rem; padding: 0 4px;
+  }
+  .desc-bar-close:hover { color: var(--danger); }
+  .desc-bar-textarea {
+    width: 100%; flex: 1; min-height: 60px; resize: vertical;
+    padding: 10px 12px; border-radius: 6px;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.25); color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem; line-height: 1.5; outline: none;
+    transition: border-color 0.15s;
+  }
+  .desc-bar-textarea:focus { border-color: var(--accent); }
+  .desc-bar-preview {
+    flex: 1; padding: 10px 12px; border-radius: 6px;
+    background: rgba(0,0,0,0.12); border: 1px solid var(--border);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem; line-height: 1.5;
+    overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+    min-height: 60px;
+  }
+  .desc-bar-resize {
+    position: absolute; top: 0; left: 0; right: 0; height: 6px;
+    cursor: ns-resize; z-index: 10;
+    background: transparent; transition: background 0.15s;
+  }
+  .desc-bar-resize:hover { background: rgba(137, 180, 250, 0.3); }
+  .desc-bar-corner {
+    position: absolute; bottom: 0; right: 0;
+    width: 16px; height: 16px; cursor: nwse-resize; z-index: 10;
+    background: linear-gradient(135deg, transparent 40%, rgba(137, 180, 250, 0.4) 40%, rgba(137, 180, 250, 0.4) 55%, transparent 55%);
+    transition: opacity 0.15s; opacity: 0.5;
+  }
+  .desc-bar-corner:hover { opacity: 1; }
+
+  .syn-valid     { color: #a6e3a1; font-weight: 600; }
+  .syn-invalid   { color: #f38ba8; text-decoration: line-through; }
+  .syn-incomplete { color: #fab387; }
+  .syn-url       { color: #89b4fa; text-decoration: underline; }
+  .syn-br        { color: #6c7086; font-style: italic; }
+  .syn-image     { color: #f9e2af; font-style: italic; }
+  .syn-tag       { color: #6c7086; }
+
+  /* Description Preview Panel */
+  .desc-preview-panel {
+    margin: 0 24px 16px; padding: 14px 18px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); display: none;
+  }
+  .desc-preview-panel.visible { display: block; }
+  .desc-preview-panel h4 {
+    font-size: 0.75rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .desc-preview-content {
+    font-size: 0.85rem; line-height: 1.7;
+  }
+
+  /* Auto-Complete Dropdown */
+  .autocomplete-popup {
+    position: fixed; z-index: 999;
+    background: var(--surface); border: 1px solid var(--accent);
+    border-radius: var(--radius); max-height: 220px; overflow-y: auto;
+    min-width: 200px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: none;
+  }
+  .autocomplete-popup.visible { display: block; }
+  .autocomplete-item {
+    padding: 8px 14px; cursor: pointer; font-size: 0.82rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:hover, .autocomplete-item.active {
+    background: rgba(137, 180, 250, 0.15); color: var(--accent);
+  }
+  .autocomplete-item .ac-sub { font-size: 0.7rem; color: var(--text-muted); display: block; }
+
+  /* Row */
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  tr.row-new { animation: highlight 2s ease-out; }
+  @keyframes highlight { from { background: rgba(166, 227, 161, 0.2); } }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.95rem; }
+  @media (max-width: 768px) {
+    header { padding: 10px 14px; }
+    .table-wrapper { margin: 10px 8px; }
+    td[contenteditable] { max-width: 180px; }
+  }
+
+  /* ── In-App Search Bar ─────────────────────────── */
+  .search-wrap {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,0,0,0.2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; transition: border-color 0.15s;
+  }
+  .search-wrap:focus-within { border-color: var(--accent); }
+  .search-wrap input {
+    background: none; border: none; color: var(--text);
+    font-size: 0.82rem; outline: none; width: 160px; padding: 4px 0;
+  }
+  .search-wrap input::placeholder { color: var(--text-muted); }
+  .search-wrap .search-hint {
+    font-size: 0.65rem; color: var(--text-muted);
+    background: var(--surface); padding: 2px 6px; border-radius: 3px;
+    white-space: nowrap;
+  }
+  .search-count { font-size: 0.75rem; color: var(--accent); white-space: nowrap; }
+
+  /* ── Image Cell ────────────────────────────────── */
+  .image-cell-wrap {
+    display: flex; align-items: center; gap: 4px; min-width: 140px;
+  }
+  .image-cell-input {
+    flex: 1; min-width: 60px; background: none; border: none;
+    color: var(--text); font-size: 0.82rem; outline: none;
+    padding: 3px 4px; border-radius: 3px;
+  }
+  .image-cell-input:focus { background: rgba(137, 180, 250, 0.12); }
+  .image-cell-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.75rem;
+    white-space: nowrap; transition: all 0.15s;
+  }
+  .image-cell-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Image Picker Dropdown ─────────────────────── */
+  .image-picker-panel {
+    position: fixed; z-index: 300; background: var(--surface);
+    border: 1px solid var(--accent); border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6); display: none;
+    width: 320px; max-height: 360px; flex-direction: column;
+  }
+  .image-picker-panel.visible { display: flex; }
+  .image-picker-header {
+    padding: 8px 10px; border-bottom: 1px solid var(--border);
+  }
+  .image-picker-header input {
+    width: 100%; padding: 6px 10px; border-radius: 5px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); font-size: 0.82rem; outline: none;
+  }
+  .image-picker-header input:focus { border-color: var(--accent); }
+  .image-picker-list {
+    flex: 1; overflow-y: auto; padding: 4px 0;
+  }
+  .image-picker-item {
+    padding: 8px 12px; cursor: pointer; font-size: 0.8rem;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid rgba(58,58,85,0.3); transition: background 0.1s;
+  }
+  .image-picker-item:hover, .image-picker-item.active {
+    background: rgba(137, 180, 250, 0.12);
+  }
+  .image-picker-item .thumb {
+    width: 32px; height: 32px; border-radius: 4px; object-fit: cover;
+    background: var(--border); flex-shrink: 0;
+  }
+  .image-picker-item .img-name { flex: 1; word-break: break-all; }
+  .image-picker-empty {
+    padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.8rem;
+  }
+  .image-picker-close {
+    position: absolute; top: 6px; right: 10px; background: none;
+    border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 1rem; padding: 2px 6px;
+  }
+  .image-picker-close:hover { color: var(--danger); }
+
+  /* ── Auto-Match Modal ──────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 400;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); width: 90%; max-width: 700px;
+    max-height: 80vh; display: flex; flex-direction: column;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  .modal-header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-header h3 { font-size: 1rem; margin: 0; }
+  .modal-header h3 span { color: var(--accent); }
+  .modal-close {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1.3rem; padding: 0 4px;
+  }
+  .modal-close:hover { color: var(--danger); }
+  .modal-body {
+    flex: 1; overflow-y: auto; padding: 12px 20px;
+  }
+  .modal-footer {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+  .match-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid rgba(58,58,85,0.3);
+  }
+  .match-row:last-child { border-bottom: none; }
+  .match-title { flex: 1; font-size: 0.85rem; min-width: 120px; }
+  .match-arrow { color: var(--accent); font-size: 0.85rem; }
+  .match-select {
+    flex: 2; padding: 6px 8px; border-radius: 4px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); font-size: 0.8rem; outline: none;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .match-select:focus { border-color: var(--accent); }
+  .match-select.matched { border-color: var(--success); }
+  .match-select.unmatched { border-color: var(--warning); }
+  .match-preview {
+    width: 28px; height: 28px; border-radius: 3px; object-fit: cover;
+    background: var(--border); flex-shrink: 0;
+  }
+  .match-badge {
+    font-size: 0.65rem; padding: 2px 8px; border-radius: 10px;
+    white-space: nowrap; font-weight: 600;
+  }
+  .match-badge.auto { background: rgba(137, 180, 250, 0.2); color: var(--accent); }
+  .match-badge.confirmed { background: rgba(166, 227, 161, 0.2); color: var(--success); }
+  .match-badge.manual { background: rgba(249, 226, 175, 0.2); color: var(--warning); }
+
+  /* Match status bar */
+  .match-stats {
+    display: flex; gap: 12px; padding: 8px 20px;
+    font-size: 0.78rem; color: var(--text-muted);
+    background: rgba(0,0,0,0.1); border-bottom: 1px solid var(--border);
+  }
+  .match-stats strong { color: var(--text); }
+
+  /* ── Tag Monitor Panel ────────────────────────── */
+  .tag-monitor {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 250;
+    background: var(--surface); border-top: 2px solid var(--accent);
+    height: 200px; min-height: 80px; max-height: 60vh;
+    display: none; flex-direction: column;
+  }
+  .tag-monitor.visible { display: flex; }
+  .tag-monitor-resize {
+    position: absolute; top: -8px; left: 0; right: 0; height: 12px;
+    cursor: ns-resize; z-index: 10;
+  }
+  .tag-monitor-resize::after {
+    content: ''; position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 4px; border-radius: 2px;
+    background: var(--border); transition: background 0.15s;
+  }
+  .tag-monitor-resize:hover::after { background: var(--accent); }
+  .tag-monitor-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .tag-monitor-header h3 { font-size: 0.85rem; margin: 0; white-space: nowrap; }
+  .tag-monitor-header h3 span { color: var(--accent); }
+  .tag-monitor-search {
+    flex: 1; padding: 5px 10px; border-radius: 5px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); font-size: 0.8rem; outline: none;
+  }
+  .tag-monitor-search:focus { border-color: var(--accent); }
+  .tag-monitor-close {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1.1rem; padding: 2px 6px;
+  }
+  .tag-monitor-close:hover { color: var(--danger); }
+  .tag-monitor-list {
+    flex: 1; overflow-y: auto; padding: 8px 12px;
+    display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start;
+  }
+  .tag-chip {
+    padding: 5px 12px; border-radius: 14px; cursor: pointer;
+    font-size: 0.78rem; font-weight: 500;
+    background: rgba(137, 180, 250, 0.1);
+    border: 1px solid rgba(137, 180, 250, 0.25);
+    color: var(--text); transition: all 0.15s;
+    user-select: none; white-space: nowrap;
+  }
+  .tag-chip:hover {
+    background: rgba(137, 180, 250, 0.2);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .tag-chip .tag-count {
+    font-size: 0.68rem; color: var(--text-muted);
+    margin-left: 2px;
+  }
+  .tag-chip.hot { background: rgba(166, 227, 161, 0.15); border-color: rgba(166, 227, 161, 0.35); }
+  .tag-chip.hot .tag-count { color: var(--success); }
+  .tag-chip.active {
+    background: rgba(137, 180, 250, 0.25);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+    order: -1;
+  }
+  .tag-chip.active .tag-count { color: var(--accent); }
+  .tag-chip.active::before { content: '✓ '; font-size: 0.7rem; }
+  body.has-tag-monitor { padding-bottom: 220px; }
+
+  /* ── Row-Level Edit Lock ──────────────────────── */
+  td[contenteditable="false"] { cursor: default; }
+  tr.row-selected td { background: rgba(137, 180, 250, 0.08) !important; }
+  tr.row-selected td[contenteditable] { cursor: text; }
+  tr:not(.row-selected) td[contenteditable] { cursor: default; }
+  tr.row-selected td[contenteditable="true"]:hover { background: rgba(137, 180, 250, 0.14) !important; }
+  .row-lock-hint {
+    font-size: 0.7rem; color: var(--text-muted);
+    padding: 2px 8px; border-radius: 3px;
+    background: rgba(137, 180, 250, 0.08);
+    white-space: nowrap;
+  }
+
+  /* ── Blog Editor ─────────────────────────────── */
+  .blog-editor { display: none; flex-direction: column; height: calc(100vh - 130px); margin: 0 24px; }
+  .blog-editor.visible { display: flex; }
+  .blog-editor-toolbar {
+    display: flex; gap: 8px; align-items: center; padding: 10px 0;
+    border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+  }
+  .blog-editor-toolbar .btn { font-size: 0.82rem; }
+  .blog-editor-body { display: flex; flex: 1; gap: 16px; min-height: 0; padding-top: 12px; }
+  .blog-editor-left { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 10px; }
+  .blog-editor-right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .blog-meta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .blog-meta-row .field { flex: 1; min-width: 140px; }
+  .blog-meta-row .field.slug-field { flex: 0.6; min-width: 120px; }
+  .blog-meta-row .field.tag-field { flex: 0.4; min-width: 100px; }
+  .blog-meta-row label {
+    display: block; font-size: 0.7rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+  }
+  .blog-meta-row input, .blog-meta-row select {
+    width: 100%; padding: 8px 10px; border-radius: 6px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); font-size: 0.85rem; outline: none;
+    font-family: inherit;
+  }
+  .blog-meta-row input:focus, .blog-meta-row select:focus { border-color: var(--accent); }
+  .blog-body-editor {
+    flex: 1; min-height: 200px; padding: 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82rem; line-height: 1.7; resize: none; outline: none;
+    tab-size: 2;
+  }
+  .blog-body-editor:focus { border-color: var(--accent); }
+  .blog-preview {
+    flex: 1; padding: 16px 20px; border-radius: 8px;
+    border: 1px solid var(--border); background: #fafafa;
+    color: #2c3e50; overflow-y: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.9rem; line-height: 1.8;
+  }
+  .blog-preview h2 { color: #1E6F9F; margin: 1.2em 0 0.4em; font-size: 1.3rem; }
+  .blog-preview p { margin: 0 0 0.8em; }
+  .blog-preview .article-image { text-align: center; margin: 1.5em 0; }
+  .blog-preview .article-image img { max-width: 100%; border-radius: 8px; }
+  .blog-preview .image-caption { display: block; font-weight: 600; font-size: 0.85rem; color: #666; margin-top: 6px; }
+  .blog-preview .empty-preview { color: #999; font-style: italic; text-align: center; padding: 40px 0; }
+  .blog-articles-sidebar {
+    width: 220px; flex-shrink: 0; border-right: 1px solid var(--border);
+    overflow-y: auto; padding-right: 10px; display: none;
+  }
+  .blog-articles-sidebar.visible { display: block; }
+  .blog-articles-sidebar h4 { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+  .blog-article-item {
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 0.8rem; margin-bottom: 2px; transition: background 0.1s;
+    border: 1px solid transparent;
+  }
+  .blog-article-item:hover { background: rgba(137, 180, 250, 0.08); }
+  .blog-article-item.active { background: rgba(137, 180, 250, 0.15); border-color: var(--accent); }
+  .blog-article-item .ba-title { font-weight: 500; }
+  .blog-article-item .ba-date { font-size: 0.68rem; color: var(--text-muted); }
+  .blog-image-drop {
+    border: 2px dashed var(--border); border-radius: 8px;
+    padding: 20px; text-align: center; cursor: pointer;
+    color: var(--text-muted); font-size: 0.8rem; transition: all 0.15s;
+    margin-top: 8px; flex-shrink: 0;
+  }
+  .blog-image-drop:hover, .blog-image-drop.drag-over { border-color: var(--accent); color: var(--accent); }
+  .blog-image-drop .drop-icon { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+  .blog-upload-status { font-size: 0.72rem; color: var(--success); margin-top: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📊 JSON <span>Table Editor</span></h1>
+  <div class="file-tabs" id="fileTabs"></div>
+  <div class="toolbar">
+    <div class="search-wrap" id="searchWrap" style="display:none">
+      <span>🔍</span>
+      <input type="text" id="searchInput" placeholder="Filter rows…" oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+      <span class="search-hint">Ctrl+F</span>
+      <span class="search-count" id="searchCount"></span>
+    </div>
+    <button class="btn primary" onclick="addRow()" title="Add a new row (Ctrl+N)">＋ Add Row</button>
+    <button class="btn" onclick="saveData()" title="Save changes to disk (Ctrl+S)">💾 Save</button>
+    <button class="btn" onclick="exportCSV()" title="Download as CSV">📥 CSV</button>
+    <button class="btn" id="autoMatchBtn" onclick="openAutoMatch()" title="Auto-match places to images" style="display:none">🖼 Auto-Match</button>
+    <button class="btn danger" onclick="confirmDeleteSelected()" title="Delete selected rows">🗑 Delete</button>
+  </div>
+</header>
+<div class="status-bar">
+  <span>File: <strong id="currentFile">—</strong></span>
+  <span>|</span>
+  <span id="rowCount">0 rows</span>
+  <span>|</span>
+  <span class="status-dot" id="statusDot"></span>
+  <span id="statusText">Ready</span>
+</div>
+<div class="table-wrapper">
+  <table>
+    <thead id="tableHead"></thead>
+    <tbody id="tableBody">
+      <tr><td colspan="99" class="empty-state">
+        <div class="icon">📂</div>
+        <p>Select a JSON file from the tabs above to get started.<br>
+        <small>Tip: You can paste tabular data directly from Google Sheets (Ctrl+V)</small></p>
+      </td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Bottom Description Editing Bar -->
+<div class="desc-bar hidden" id="descBar">
+  <div class="desc-bar-resize" id="descBarResize" title="Drag to resize"></div>
+  <div class="desc-bar-left">
+    <div class="desc-bar-header">
+      📝 Editing <strong id="descBarTitle">—</strong> · Row <span id="descBarRow">—</span>
+      <button class="desc-bar-close" onclick="closeDescBar()" title="Close (Esc)">✕</button>
+    </div>
+    <textarea class="desc-bar-textarea" id="descBarTextarea" placeholder="Type description here... Use <place>Name</place>, <event>Name+Place+day</event>, <a href='url'>text</a>, <br>" spellcheck="true"></textarea>
+  </div>
+  <div class="desc-bar-right">
+    <div class="desc-bar-header">🔍 Live Preview</div>
+    <div class="desc-bar-preview" id="descBarPreview"></div>
+  </div>
+  <div class="desc-bar-corner" id="descBarCorner" title="Drag corner to resize"></div>
+</div>
+
+<!-- Auto-Complete Dropdown -->
+<div class="autocomplete-popup" id="autocompletePopup"></div>
+
+<!-- Image Picker Panel -->
+<div class="image-picker-panel" id="imagePicker">
+  <button class="image-picker-close" onclick="closeImagePicker()" title="Close">✕</button>
+  <div class="image-picker-header">
+    <input type="text" id="imagePickerSearch" placeholder="Search images…" oninput="filterImagePicker()" onkeydown="onImagePickerKeydown(event)">
+  </div>
+  <div class="image-picker-list" id="imagePickerList"></div>
+</div>
+
+<!-- Auto-Match Modal -->
+<div class="modal-overlay" id="autoMatchOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🖼 Auto-Match <span>Place → Image</span></h3>
+      <button class="modal-close" onclick="closeAutoMatch()">✕</button>
+    </div>
+    <div class="match-stats" id="matchStats"></div>
+    <div class="modal-body" id="autoMatchBody"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAutoMatch()">Cancel</button>
+      <button class="btn primary" onclick="applyAutoMatches()">✅ Apply & Save Matches</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tag Monitor Panel -->
+<div class="tag-monitor" id="tagMonitor">
+  <div class="tag-monitor-resize" id="tagMonitorResize" title="Drag to resize"></div>
+  <div class="tag-monitor-header">
+    <h3>🏷️ Tag <span>Monitor</span></h3>
+    <input class="tag-monitor-search" id="tagMonitorSearch" placeholder="Filter tags…" oninput="filterTagMonitor()">
+    <button class="tag-monitor-close" onclick="hideTagMonitor()" title="Close">✕</button>
+  </div>
+  <div class="tag-monitor-list" id="tagMonitorList"></div>
+</div>
+
+<!-- Blog Editor -->
+<div class="blog-editor" id="blogEditor">
+  <div class="blog-editor-toolbar">
+    <button class="btn primary" onclick="blogCreate()" title="Create new article">＋ New Article</button>
+    <button class="btn" onclick="blogSave()" title="Save article (publishes to RoamWeb)">💾 Publish</button>
+    <button class="btn" onclick="blogLoadList()" title="Refresh article list">🔄 Refresh</button>
+    <span style="font-size:0.75rem;color:var(--text-muted);margin-left:8px" id="blogStatus"></span>
+  </div>
+  <div class="blog-editor-body">
+    <div class="blog-articles-sidebar visible" id="blogSidebar">
+      <h4>📄 Articles</h4>
+      <div id="blogArticleList"></div>
+    </div>
+    <div class="blog-editor-left">
+      <div class="blog-meta-row">
+        <div class="field" style="flex:2">
+          <label>Headline</label>
+          <input type="text" id="blogHeadline" placeholder="Article headline…" oninput="blogAutoSlug()">
+        </div>
+        <div class="field slug-field">
+          <label>Slug</label>
+          <input type="text" id="blogSlug" placeholder="url-slug">
+        </div>
+        <div class="field tag-field">
+          <label>Tag</label>
+          <select id="blogTag">
+            <option>Travel Tips</option><option>Local Stories</option><option>Festivals & Events</option>
+            <option>Food & Drink</option><option>Beaches</option><option>Adventure</option>
+            <option>Culture</option><option>Nightlife</option>
+          </select>
+        </div>
+      </div>
+      <div class="blog-meta-row">
+        <div class="field">
+          <label>Subheadline</label>
+          <input type="text" id="blogSubheadline" placeholder="Brief description / subtitle…">
+        </div>
+      </div>
+      <div class="blog-meta-row">
+        <div class="field">
+          <label>🖼 Hero Image <small style="color:var(--text-muted);font-weight:400">(for blog cards & thumbnails)</small></label>
+          <div class="blog-image-drop hero-drop" id="blogHeroDrop" onclick="document.getElementById('blogHeroInput').click()" style="padding:10px;margin-top:0">
+            <span id="blogHeroStatus">Drop hero image here or click</span>
+            <input type="file" id="blogHeroInput" accept="image/*" style="display:none" onchange="blogUploadHero(this.files[0])">
+          </div>
+        </div>
+      </div>
+      <textarea class="blog-body-editor" id="blogBody" placeholder="## Heading&#10;&#10;Write your article here...&#10;&#10;## Another section&#10;More text goes here.&#10;&#10;[img:photo.jpg]&#10;A caption for the photo&#10;&#10;Raw HTML for embeds works too." oninput="blogPreview()"></textarea>
+      <div class="blog-image-drop" id="blogImageDrop" onclick="document.getElementById('blogImageInput').click()">
+        <span class="drop-icon">📸</span>
+        Drop images here or click to upload<br><small>Auto-resizes to 500px max</small>
+        <input type="file" id="blogImageInput" accept="image/*" style="display:none" onchange="blogUploadImage(this.files[0])">
+      </div>
+      <div class="blog-upload-status" id="blogUploadStatus"></div>
+    </div>
+    <div class="blog-editor-right">
+      <div class="blog-preview" id="blogPreview">
+        <div class="empty-preview">👁️ Live preview will appear here as you type…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentFile = null;
+let currentData = [];
+let originalData = null;
+let isDirty = false;
+let lookupData = {};
+let allKeys = [];
+let placesMeta = { labels: [], tags: [] };
+let activeRowIdx = -1; // currently locked row (-1 = none)
+let sortColumn = null;  // current sort column key
+let sortDir = 1;        // 1 = asc, -1 = desc
+
+const linkedColumns = {
+  'events.json': {
+    'place': {
+      lookupFile: 'places.json',
+      lookupKey: 'title',
+      autofill: { 'placeurl': 'googleurl' }
+    }
+  }
+};
+
+document.addEventListener('DOMContentLoaded', loadFileList);
+
+async function loadFileList() {
+  try {
+    const resp = await fetch('/api/files');
+    const files = await resp.json();
+    // Filter out deprecated files
+    const active = files.filter(f => f !== 'notifications.json');
+    renderFileTabs(active);
+    if (active.length > 0) selectFile(active[0]);
+  } catch (err) { setStatus('error', 'Failed to load file list'); }
+}
+
+function renderFileTabs(files) {
+  document.getElementById('fileTabs').innerHTML = files.map(f =>
+    `<button class="file-tab" data-file="${f}" onclick="selectFile('${f}')">${f}</button>`
+  ).join('') + '<button class="file-tab" data-file="__blog__" onclick="openBlogEditor()" style="border-color:var(--accent);color:var(--accent)">📝 Blog</button>';
+}
+
+function highlightActiveTab(filename) {
+  document.querySelectorAll('.file-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.file === filename);
+  });
+}
+
+async function selectFile(filename) {
+  if (isDirty && !confirm('You have unsaved changes. Discard them?')) return;
+  currentFile = filename;
+  highlightActiveTab(filename);
+  document.getElementById('currentFile').textContent = filename;
+  closeDescBar();
+  setStatus('', 'Loading...');
+  try {
+    const resp = await fetch('/api/data/' + encodeURIComponent(filename));
+    if (!resp.ok) throw new Error((await resp.json()).error || 'Load failed');
+    currentData = await resp.json();
+    originalData = JSON.parse(JSON.stringify(currentData));
+    isDirty = false;
+    // Load label/tag metadata for places.json
+    if (filename === 'places.json') {
+      try {
+        const metaResp = await fetch('/api/places-meta');
+        if (metaResp.ok) placesMeta = await metaResp.json();
+      } catch (_) { placesMeta = { labels: [], tags: [] }; }
+    }
+    await loadLookupData(filename);
+    renderTable();
+    setStatus('saved', currentData.length + ' rows loaded');
+  } catch (err) {
+    setStatus('error', err.message);
+    currentData = [];
+    renderTable();
+  }
+}
+
+async function loadLookupData(filename) {
+  const links = linkedColumns[filename];
+  if (!links) {
+    await ensureAutocompleteData();
+    return;
+  }
+  for (const [col, cfg] of Object.entries(links)) {
+    if (lookupData[cfg.lookupFile]) continue;
+    try {
+      const resp = await fetch('/api/data/' + encodeURIComponent(cfg.lookupFile));
+      if (resp.ok) lookupData[cfg.lookupFile] = await resp.json();
+    } catch (_) {}
+  }
+  await ensureAutocompleteData();
+}
+
+async function ensureAutocompleteData() {
+  for (const f of ['places.json', 'events.json']) {
+    if (!lookupData[f]) {
+      try {
+        const resp = await fetch('/api/data/' + f);
+        if (resp.ok) lookupData[f] = await resp.json();
+      } catch (_) {}
+    }
+  }
+}
+
+function renderTable() {
+  const thead = document.getElementById('tableHead');
+  const tbody = document.getElementById('tableBody');
+  if (!currentData.length) {
+    thead.innerHTML = '';
+    tbody.innerHTML = '<tr><td colspan="99" class="empty-state"><div class="icon">📭</div><p>No data in <strong>' + currentFile + '</strong>. Click "＋ Add Row" to begin.</p></td></tr>';
+    document.getElementById('rowCount').textContent = '0 rows';
+    updateStatusDot();
+    return;
+  }
+  allKeys = [];
+  const seen = new Set();
+  for (const row of currentData) {
+    if (row && typeof row === 'object') {
+      for (const key of Object.keys(row)) {
+        if (!seen.has(key)) { seen.add(key); allKeys.push(key); }
+      }
+    }
+  }
+  const fileLinks = linkedColumns[currentFile] || {};
+  thead.innerHTML = '<tr><th class="col-check"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" title="Select all"></th><th class="col-num">#</th>' +
+    allKeys.map(k => {
+      let arrow = '';
+      if (sortColumn === k) arrow = sortDir === 1 ? ' ▲' : ' ▼';
+      return '<th class="sortable" onclick="sortBy(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\')" title="Click to sort">' + escapeHtml(k) + (fileLinks[k] ? ' 🔗' : '') + '<span class="sort-arrow">' + arrow + '</span></th>';
+    }).join('') +
+    '<th class="col-actions">Actions</th></tr>';
+
+  tbody.innerHTML = currentData.map((row, idx) => {
+    return '<tr id="row-' + idx + '" data-index="' + idx + '">' +
+      '<td style="text-align:center"><input type="checkbox" class="row-check" data-index="' + idx + '"></td>' +
+      '<td class="row-num">' + (idx + 1) + '</td>' +
+      allKeys.map(key => renderCell(key, row, idx, fileLinks)).join('') +
+      '<td style="text-align:center;white-space:nowrap">' +
+        '<button class="btn" onclick="duplicateRow(' + idx + ')" title="Duplicate" style="padding:3px 8px;font-size:0.75rem">⧉</button> ' +
+        '<button class="btn danger" onclick="deleteRow(' + idx + ')" title="Delete" style="padding:3px 8px;font-size:0.75rem">✕</button>' +
+      '</td></tr>';
+  }).join('');
+
+  tbody.addEventListener('input', onCellInput);
+  tbody.addEventListener('focusout', onCellBlur);
+  tbody.addEventListener('change', onDropdownChange);
+  tbody.addEventListener('paste', onPaste);
+  // Bottom bar textarea events
+  const barTa = document.getElementById('descBarTextarea');
+  barTa.addEventListener('input', onBarTextareaInput);
+  barTa.addEventListener('blur', onBarTextareaBlur);
+  barTa.addEventListener('keydown', onBarTextareaKeydown);
+  // Esc to close
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeDescBar();
+  });
+  document.getElementById('rowCount').textContent = currentData.length + ' rows × ' + allKeys.length + ' cols';
+  updateStatusDot();
+}
+
+function renderCell(key, row, idx, fileLinks) {
+  let rawVal = (row && typeof row === 'object') ? row[key] : '';
+  if (rawVal === null || rawVal === undefined) rawVal = '';
+  const strVal = (typeof rawVal === 'object') ? JSON.stringify(rawVal) : String(rawVal);
+  const escVal = escapeHtml(strVal);
+  const linkCfg = fileLinks[key];
+
+  // ── Label field in places.json: single-select dropdown ──
+  if (currentFile === 'places.json' && key === 'label') {
+    const options = (placesMeta.labels || []).map(l =>
+      '<option value="' + escapeHtml(l) + '"' + (strVal === l ? ' selected' : '') + '>' + escapeHtml(l) + '</option>'
+    );
+    return '<td class="dropdown-cell" data-key="label" data-index="' + idx + '">' +
+      '<select data-key="label" data-index="' + idx + '">' +
+      '<option value="">—</option>' + options.join('') + '</select></td>';
+  }
+
+  // ── Tags field: free text + tag monitor panel at bottom ──
+  if (currentFile === 'places.json' && key === 'tags') {
+    const editable = (idx === activeRowIdx) ? 'true' : 'false';
+    return '<td contenteditable="' + editable + '" data-key="tags" data-index="' + idx + '" data-original="' + escVal + '" class="tags-free-cell">' + escVal + '</td>';
+  }
+
+  // ── Image field in places.json: searchable input + dropdown button ──
+  if (currentFile === 'places.json' && key === 'image') {
+    return '<td class="image-cell-td" data-key="image" data-index="' + idx + '">' +
+      '<div class="image-cell-wrap">' +
+        '<input class="image-cell-input" type="text" value="' + escVal + '" ' +
+          'data-key="image" data-index="' + idx + '" ' +
+          'onfocus="openImagePicker(this)" oninput="onImageCellInput(this)" ' +
+          'onkeydown="onImageCellKeydown(event, this)" placeholder="(no image)">' +
+        '<button class="image-cell-btn" onclick="openImagePicker(this.previousElementSibling)" title="Browse images">📁</button>' +
+      '</div></td>';
+  }
+
+  if (linkCfg) {
+    const lookupRows = lookupData[linkCfg.lookupFile] || [];
+    const options = lookupRows.map(r => {
+      const label = r[linkCfg.lookupKey] ?? '';
+      const sel = (label === rawVal) ? ' selected' : '';
+      return '<option value="' + escapeHtml(String(label)) + '"' + sel + '>' + escapeHtml(String(label)) + '</option>';
+    });
+    return '<td class="dropdown-cell" data-key="' + escapeHtml(key) + '" data-index="' + idx + '">' +
+      '<select data-key="' + escapeHtml(key) + '" data-index="' + idx + '">' +
+      '<option value="">—</option>' + options.join('') + '</select></td>';
+  }
+  // Tab picker for appcontent.json
+  if (currentFile === 'appcontent.json' && key === 'tab') {
+    const tabs = ['featured', 'home', 'eat', 'activity'];
+    const options = tabs.map(t => '<option value="' + t + '"' + (strVal === t ? ' selected' : '') + '>' + t + '</option>');
+    return '<td class="dropdown-cell" data-key="' + escapeHtml(key) + '" data-index="' + idx + '">' +
+      '<select data-key="' + escapeHtml(key) + '" data-index="' + idx + '">' +
+      '<option value="">—</option>' + options.join('') + '</select></td>';
+  }
+  // Description field in appcontent.json — truncated cell, click to open bottom bar
+  if (currentFile === 'appcontent.json' && key === 'description') {
+    const preview = strVal.length > 150 ? strVal.substring(0, 150) + '…' : strVal;
+    return '<td class="desc-cell" data-key="' + escapeHtml(key) + '" data-index="' + idx + '">' +
+      '<div class="desc-cell-inner" data-key="' + escapeHtml(key) + '" data-index="' + idx + '" onclick="openDescBar(' + idx + ')" title="Click to edit in bottom bar">' +
+        escapeHtml(preview) +
+      '</div></td>';
+  }
+  const editable = (idx === activeRowIdx) ? 'true' : 'false';
+  return '<td contenteditable="' + editable + '" data-key="' + escapeHtml(key) + '" data-index="' + idx + '" data-original="' + escVal + '">' + escVal + '</td>';
+}
+
+function onDropdownChange(e) {
+  const select = e.target.closest('select');
+  if (!select) return;
+  const idx = parseInt(select.dataset.index);
+  const key = select.dataset.key;
+  const newVal = select.value;
+  const fileLinks = linkedColumns[currentFile] || {};
+  const linkCfg = fileLinks[key];
+  currentData[idx][key] = newVal;
+  isDirty = true;
+  updateStatusDot();
+  if (linkCfg && linkCfg.autofill && newVal) {
+    const lookupRows = lookupData[linkCfg.lookupFile] || [];
+    const match = lookupRows.find(r => String(r[linkCfg.lookupKey] ?? '') === newVal);
+    if (match) {
+      for (const [targetCol, sourceCol] of Object.entries(linkCfg.autofill)) {
+        currentData[idx][targetCol] = match[sourceCol] ?? '';
+      }
+      renderTable();
+      setStatus('unsaved', 'Place selected — ' + Object.keys(linkCfg.autofill).join(', ') + ' auto-filled');
+      return;
+    }
+  }
+  if (newVal) setStatus('unsaved', 'Place changed');
+}
+
+function onCellInput(e) {
+  const td = e.target.closest('td[contenteditable]');
+  if (!td) return;
+  isDirty = true;
+  updateStatusDot();
+}
+
+function onCellBlur(e) {
+  const td = e.target.closest('td[contenteditable]');
+  if (!td) return;
+  const idx = parseInt(td.dataset.index);
+  const key = td.dataset.key;
+  let newVal = td.textContent.trim();
+  const origVal = currentData[idx]?.[key];
+  if (typeof origVal === 'number' && newVal !== '' && !isNaN(Number(newVal))) {
+    newVal = Number(newVal);
+  } else if (typeof origVal === 'boolean') {
+    if (newVal.toLowerCase() === 'true') newVal = true;
+    else if (newVal.toLowerCase() === 'false') newVal = false;
+  } else if (origVal && typeof origVal === 'object' && newVal !== '') {
+    try { newVal = JSON.parse(newVal); } catch (_) {}
+  }
+  if (newVal === '') newVal = (typeof origVal === 'number') ? 0 : (typeof origVal === 'boolean' ? false : '');
+  currentData[idx][key] = newVal;
+  setStatus('unsaved', 'Unsaved changes');
+}
+
+// ═══════════════════════════════════════
+//  DESCRIPTION SYNTAX HIGHLIGHTING
+//  Parses <link>/place/X</link>, <event>X+Y+Z</event>,
+//  <a href='...'>text</a>, <br> tags.
+//  Green = valid reference. Orange = incomplete tag.
+// ═══════════════════════════════════════
+function highlightDescription(text) {
+  if (!text) return '';
+
+  // Pre-compute lookup sets
+  const placeNames = new Set();
+  const eventKeys = [];
+  if (lookupData['places.json']) {
+    lookupData['places.json'].forEach(p => { if (p.title) placeNames.add(p.title.toLowerCase()); });
+  }
+  if (lookupData['events.json']) {
+    lookupData['events.json'].forEach(ev => {
+      const key = (ev.name || '') + '+' + (ev.place || '') + '+' + (ev.eventday || '');
+      eventKeys.push({ name: ev.name || '', place: ev.place || '', day: ev.eventday || '', key: key.toLowerCase() });
+    });
+  }
+
+  let html = escapeHtml(text);
+  let hasMatch = false;
+
+  // 1. Place links: <place>NAME</place>
+  html = html.replace(/&lt;place&gt;([^&]+)&lt;\/place&gt;/gi, function(m, name) {
+    const rawName = unescapeHtml(name);
+    const isValid = placeNames.has(rawName.toLowerCase());
+    hasMatch = true;
+    return '<span class="syn-tag">&lt;place&gt;</span><span class="' +
+      (isValid ? 'syn-valid' : 'syn-invalid') + '" title="' + (isValid ? '✅ Valid place' : '❌ Place not found in places.json') + '">' +
+      name + '</span><span class="syn-tag">&lt;/place&gt;</span>';
+  });
+
+  // 2. Valid event links: <event>NAME+PLACE+DAY</event>
+  // Uses .+? (lazy) because event names can contain & (e.g. "CLAYTON CARTY & ACOUSTICS")
+  html = html.replace(/&lt;event&gt;(.+?)&lt;\/event&gt;/gi, function(m, key) {
+    const rawKey = unescapeHtml(key);
+    const parts = rawKey.split('+');
+    const evName = (parts[0] || '').trim();
+    const evPlace = (parts[1] || '').trim();
+    const evDay = (parts[2] || '').trim();
+    const isValid = eventKeys.some(ek => {
+      return (evName === '' || ek.name.toLowerCase().includes(evName.toLowerCase()))
+          && (evPlace === '' || ek.place.toLowerCase().includes(evPlace.toLowerCase()))
+          && (evDay === '' || ek.day.toLowerCase().includes(evDay.toLowerCase()));
+    });
+    hasMatch = true;
+    return '<span class="syn-tag">&lt;event&gt;</span><span class="' +
+      (isValid ? 'syn-valid' : 'syn-invalid') + '" title="' + (isValid ? '✅ Valid event' : '❌ Event not found') + '">' +
+      key + '</span><span class="syn-tag">&lt;/event&gt;</span>';
+  });
+
+  // 3. URL links: <a href='URL'>text</a> or <a href="URL">text</a>
+  html = html.replace(/&lt;a\s+href=(?:&#39;|&quot;)([^'&]*?)(?:&#39;|&quot;)&gt;([^&]*)&lt;\/a&gt;/gi, function(m, url, txt) {
+    hasMatch = true;
+    return '<span class="syn-tag">&lt;a href=&#39;</span><span class="syn-url">' + url + '</span><span class="syn-tag">&#39;&gt;</span>' +
+      txt + '<span class="syn-tag">&lt;/a&gt;</span>';
+  });
+
+  // 4. Line breaks: <br>, <br/>, <br />
+  html = html.replace(/&lt;br\s*\/?&gt;/gi, '<span class="syn-br">↵&lt;br&gt;</span>');
+
+  // 4b. Image tags: <image>filename.jpg</image>
+  html = html.replace(/&lt;image&gt;([^&]+)&lt;\/image&gt;/gi, function(m, fn) {
+    const rawFn = unescapeHtml(fn);
+    const imgUrl = 'https://kahlaylae.github.io/RoamCMS/images/' + rawFn;
+    return '<span class="syn-tag">&lt;image&gt;</span><span class="syn-valid" title="📸 ' + imgUrl + '">' + fn + '</span><span class="syn-tag">&lt;/image&gt;</span>';
+  });
+
+  // 5. Incomplete tags (opened but not closed) — only if no valid tags matched
+  if (!hasMatch) {
+    // Incomplete <place> (no closing </place>)
+    html = html.replace(/&lt;place&gt;(?!.*&lt;\/place&gt;)(.*)$/gi, function(m, rest) {
+      return '<span class="syn-tag">&lt;place&gt;</span><span class="syn-incomplete">' + rest + '</span>';
+    });
+    // Incomplete <event> (no closing </event>)
+    html = html.replace(/&lt;event&gt;(?!.*&lt;\/event&gt;)(.*)$/gi, function(m, rest) {
+      return '<span class="syn-tag">&lt;event&gt;</span><span class="syn-incomplete">' + rest + '</span>';
+    });
+  }
+
+  return html;
+}
+
+function unescapeHtml(str) {
+  const div = document.createElement('div');
+  div.innerHTML = str;
+  return div.textContent || '';
+}
+
+// Old preview functions removed — replaced by bottom bar system
+
+// ═══════════════════════════════════════
+//  BOTTOM DESCRIPTION EDITING BAR
+// ═══════════════════════════════════════
+let descBarActiveIdx = -1;
+
+function openDescBar(idx) {
+  descBarActiveIdx = idx;
+  const row = currentData[idx];
+  const rawText = row ? String(row['description'] || '') : '';
+  const bar = document.getElementById('descBar');
+  const ta = document.getElementById('descBarTextarea');
+  bar.classList.remove('hidden');
+  ta.value = rawText;
+  ta.focus();
+  updateBarPreview(rawText);
+  document.getElementById('descBarTitle').textContent = row ? (row['title'] || 'Untitled') : '—';
+  document.getElementById('descBarRow').textContent = idx + 1;
+  // Highlight active cell
+  document.querySelectorAll('.desc-cell-inner').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('tr').forEach(el => el.classList.remove('desc-active'));
+  const cell = document.querySelector('.desc-cell-inner[data-index="' + idx + '"]');
+  if (cell) { cell.classList.add('active'); cell.closest('tr').classList.add('desc-active'); }
+  // Padding for bar
+  document.body.style.paddingBottom = '140px';
+}
+
+function closeDescBar() {
+  document.getElementById('descBar').classList.add('hidden');
+  descBarActiveIdx = -1;
+  document.querySelectorAll('.desc-cell-inner').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('tr').forEach(el => el.classList.remove('desc-active'));
+  document.body.style.paddingBottom = '';
+}
+
+function updateBarPreview(text) {
+  document.getElementById('descBarPreview').innerHTML = highlightDescription(text || '');
+}
+
+function onBarTextareaInput() {
+  isDirty = true;
+  updateStatusDot();
+  updateBarPreview(this.value);
+  checkAutocompleteOnBar(this);
+}
+
+function onBarTextareaBlur() {
+  if (descBarActiveIdx < 0) return;
+  const newVal = this.value;
+  currentData[descBarActiveIdx]['description'] = newVal;
+  setStatus('unsaved', 'Unsaved changes');
+  if (!newVal) closeDescBar();
+}
+
+function onBarTextareaKeydown(e) {
+  const popup = document.getElementById('autocompletePopup');
+  if (popup.classList.contains('visible') && acTrigger) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); navigateAutocomplete(1, popup); }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); navigateAutocomplete(-1, popup); }
+    else if (e.key === 'Enter' && acActiveIdx >= 0) { e.preventDefault(); selectAutocompleteItem(acActiveIdx, this, popup); }
+  }
+}
+
+function checkAutocompleteOnBar(el) {
+  const popup = document.getElementById('autocompletePopup');
+  const rawText = el.value;
+  const incompletePlace = rawText.match(/<place>(?![\s\S]*<\/place>)/i);
+  const incompleteEvent = rawText.match(/<event>(?![\s\S]*<\/event>)/i);
+  if (incompletePlace) {
+    const partial = rawText.substring(rawText.lastIndexOf('<place>') + 7).trim();
+    acTrigger = 'place';
+    showAutocompletePopup(el, getPlaceSuggestions(partial), popup);
+  } else if (incompleteEvent) {
+    const partial = rawText.substring(rawText.lastIndexOf('<event>') + 7).trim();
+    acTrigger = 'event';
+    showAutocompletePopup(el, getEventSuggestions(partial), popup);
+  } else {
+    popup.classList.remove('visible');
+    acTrigger = null;
+  }
+}
+
+// Resize handle — top edge + corner
+let barResizeActive = false;
+function onBarResizeStart(e) {
+  barResizeActive = true;
+  barResizeY = e.clientY;
+  barStartHeight = document.getElementById('descBar').offsetHeight;
+  document.addEventListener('mousemove', onBarResizeMove);
+  document.addEventListener('mouseup', onBarResizeEnd);
+  e.preventDefault();
+}
+function onBarResizeMove(e) {
+  if (!barResizeActive) return;
+  const dy = barResizeY - e.clientY;
+  const newH = Math.max(100, Math.min(window.innerHeight * 0.7, barStartHeight + dy));
+  document.getElementById('descBar').style.height = newH + 'px';
+  document.body.style.paddingBottom = (newH + 20) + 'px';
+}
+function onBarResizeEnd() {
+  barResizeActive = false;
+  document.removeEventListener('mousemove', onBarResizeMove);
+  document.removeEventListener('mouseup', onBarResizeEnd);
+}
+// Attach to both top edge and corner
+document.getElementById('descBarResize').addEventListener('mousedown', onBarResizeStart);
+document.getElementById('descBarCorner').addEventListener('mousedown', onBarResizeStart);
+
+// ═══════════════════════════════════════
+//  AUTO-COMPLETE FOR <link> AND <event>
+// ═══════════════════════════════════════
+let acActiveIdx = -1;
+let acTrigger = null; // 'place' or 'event'
+
+function checkAutocomplete(el, e) {
+  const popup = document.getElementById('autocompletePopup');
+  const text = el.textContent || '';
+
+  // Check if the user just typed <place> or <event>
+  const placeMatch = text.match(/<place>\s*$/i);
+  const eventMatch = text.match(/<event>\s*$/i);
+
+  if (placeMatch) {
+    acTrigger = 'place';
+    showAutocompletePopup(el, getPlaceSuggestions(''), popup);
+  } else if (eventMatch) {
+    acTrigger = 'event';
+    showAutocompletePopup(el, getEventSuggestions(''), popup);
+  } else if (e && e.key === 'Escape') {
+    popup.classList.remove('visible');
+    acTrigger = null;
+  } else if (acTrigger && e && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    e.preventDefault();
+    navigateAutocomplete(e.key === 'ArrowDown' ? 1 : -1, popup);
+    return;
+  } else if (acTrigger && e && e.key === 'Enter' && acActiveIdx >= 0) {
+    e.preventDefault();
+    selectAutocompleteItem(acActiveIdx, el, popup);
+    return;
+  } else {
+    // User is typing more — if still in an incomplete tag, keep showing
+    const incompletePlace = text.match(/<place>(?![\s\S]*<\/place>)/i);
+    const incompleteEvent = text.match(/<event>(?![\s\S]*<\/event>)/i);
+    if (incompletePlace) {
+      const partial = text.substring(text.lastIndexOf('<place>') + 7).trim();
+      acTrigger = 'place';
+      showAutocompletePopup(el, getPlaceSuggestions(partial), popup);
+    } else if (incompleteEvent) {
+      const partial = text.substring(text.lastIndexOf('<event>') + 7).trim();
+      acTrigger = 'event';
+      showAutocompletePopup(el, getEventSuggestions(partial), popup);
+    } else {
+      popup.classList.remove('visible');
+      acTrigger = null;
+    }
+  }
+}
+
+function getPlaceSuggestions(filter) {
+  if (!lookupData['places.json']) return [];
+  const f = filter.toLowerCase();
+  return lookupData['places.json']
+    .filter(p => p.title && (!f || p.title.toLowerCase().includes(f)))
+    .slice(0, 15)
+    .map(p => ({ label: p.title, value: p.title + '</place>', sub: p.location || p.type || '' }));
+}
+
+function getEventSuggestions(filter) {
+  if (!lookupData['events.json']) return [];
+  const f = filter.toLowerCase();
+  return lookupData['events.json']
+    .filter(ev => ev.name && (!f || ev.name.toLowerCase().includes(f)))
+    .slice(0, 15)
+    .map(ev => {
+      const key = ev.name + '+' + (ev.place || '') + '+' + (ev.eventday || '');
+      return { label: ev.name, value: key + '</event>', sub: (ev.place || '') + ' · ' + (ev.eventday || '') };
+    });
+}
+
+function showAutocompletePopup(el, suggestions, popup) {
+  acActiveIdx = -1;
+  if (!suggestions.length) {
+    popup.classList.remove('visible');
+    return;
+  }
+  const rect = el.getBoundingClientRect();
+  popup.style.left = rect.left + 'px';
+  popup.style.top = (rect.bottom + 4) + 'px';
+  popup.style.minWidth = Math.max(rect.width, 200) + 'px';
+  popup.innerHTML = suggestions.map((s, i) =>
+    '<div class="autocomplete-item" data-idx="' + i + '" onmousedown="selectAutocompleteItem(' + i + ', null, null)">' +
+      '<span class="ac-icon">' + (acTrigger === 'place' ? '📍' : '🗓️') + '</span> ' +
+      escapeHtml(s.label) +
+      (s.sub ? '<span class="ac-sub">' + escapeHtml(s.sub) + '</span>' : '') +
+    '</div>'
+  ).join('');
+  popup.classList.add('visible');
+}
+
+function navigateAutocomplete(dir, popup) {
+  const items = popup.querySelectorAll('.autocomplete-item');
+  if (!items.length) return;
+  items.forEach(it => it.classList.remove('active'));
+  acActiveIdx = Math.max(0, Math.min(items.length - 1, acActiveIdx + dir));
+  items[acActiveIdx].classList.add('active');
+  items[acActiveIdx].scrollIntoView({ block: 'nearest' });
+}
+
+function selectAutocompleteItem(idx, sourceEl, popup) {
+  if (!popup) popup = document.getElementById('autocompletePopup');
+  const items = popup.querySelectorAll('.autocomplete-item');
+  if (idx < 0 || idx >= items.length) return;
+
+  const item = items[idx];
+  const valueEl = item.querySelector('.ac-sub');
+  // Get the value from our suggestions directly
+  let suggestions;
+  if (acTrigger === 'place') suggestions = getPlaceSuggestions('');
+  else suggestions = getEventSuggestions('');
+
+  if (idx < suggestions.length) {
+    const sel = suggestions[idx];
+    const el = sourceEl || document.activeElement;
+    if (!el) return;
+    if (el.tagName === 'TEXTAREA') {
+      const text = el.value;
+      const tag = acTrigger === 'place' ? '<place>' : '<event>';
+      const tagIdx = text.lastIndexOf(tag);
+      if (tagIdx >= 0) {
+        const before = text.substring(0, tagIdx);
+        el.value = before + tag + sel.value;
+        el.selectionStart = el.selectionEnd = el.value.length;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    } else if (el.contentEditable === 'true' || el.isContentEditable) {
+      const text = el.textContent || '';
+      const tag = acTrigger === 'place' ? '<place>' : '<event>';
+      const tagIdx = text.lastIndexOf(tag);
+      if (tagIdx >= 0) {
+        const before = text.substring(0, tagIdx);
+        el.textContent = before + tag + sel.value;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const sel2 = window.getSelection();
+        sel2.removeAllRanges();
+        sel2.addRange(range);
+      }
+      updateBarPreview(el.textContent || '');
+    }
+  }
+  popup.classList.remove('visible');
+  acTrigger = null;
+}
+
+// Close autocomplete on outside click
+document.addEventListener('click', function(e) {
+  const popup = document.getElementById('autocompletePopup');
+  if (!popup.classList.contains('visible')) return;
+  if (!e.target.closest('.autocomplete-popup') && !e.target.closest('[contenteditable]') && !e.target.closest('.desc-display')) {
+    popup.classList.remove('visible');
+    acTrigger = null;
+  }
+});
+
+function onPaste(e) {
+  const clipboardData = e.clipboardData;
+  if (!clipboardData) return;
+  const text = clipboardData.getData('text/plain');
+  if (!text) return;
+  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+  if (!lines.length) return;
+  const rows = lines.map(line => line.split('\t'));
+  const firstRow = rows[0];
+  const headerMatchCount = firstRow.filter(cell => {
+    const norm = cell.trim().toLowerCase();
+    return allKeys.some(k => k.toLowerCase() === norm);
+  }).length;
+  let dataRows, headerMap;
+  if (headerMatchCount >= 2 && rows.length > 1) {
+    headerMap = {};
+    firstRow.forEach((h, ci) => {
+      const norm = h.trim().toLowerCase();
+      const matchKey = allKeys.find(k => k.toLowerCase() === norm);
+      if (matchKey) headerMap[matchKey] = ci;
+    });
+    dataRows = rows.slice(1);
+  } else {
+    headerMap = {};
+    allKeys.forEach((k, i) => { if (i < firstRow.length) headerMap[k] = i; });
+    dataRows = rows;
+  }
+  if (!Object.keys(headerMap).length) return;
+  let targetIdx = 0;
+  const activeEl = document.activeElement;
+  if (activeEl) {
+    const td = activeEl.closest('td[data-index]');
+    if (td) targetIdx = parseInt(td.dataset.index);
+  }
+  e.preventDefault();
+  let filledCount = 0;
+  const fileLinks = linkedColumns[currentFile] || {};
+  for (let r = 0; r < dataRows.length; r++) {
+    const rowIdx = targetIdx + r;
+    while (rowIdx >= currentData.length) {
+      const template = {};
+      if (currentData.length > 0) {
+        for (const k of Object.keys(currentData[0])) {
+          const v = currentData[0][k];
+          template[k] = (typeof v === 'number') ? 0 : (typeof v === 'boolean' ? false : '');
+        }
+      }
+      currentData.push(template);
+    }
+    for (const [key, colIdx] of Object.entries(headerMap)) {
+      if (colIdx < dataRows[r].length) {
+        const cellVal = dataRows[r][colIdx].trim();
+        const linkCfg = fileLinks[key];
+        if (linkCfg && cellVal) {
+          const lookupRows = lookupData[linkCfg.lookupFile] || [];
+          const lookupKey = linkCfg.lookupKey;
+          let match = lookupRows.find(r2 => String(r2[lookupKey] ?? '') === cellVal);
+          if (!match) match = lookupRows.find(r2 => String(r2[lookupKey] ?? '').toLowerCase() === cellVal.toLowerCase());
+          if (match) {
+            currentData[rowIdx][key] = match[lookupKey];
+            if (linkCfg.autofill) {
+              for (const [targetCol, sourceCol] of Object.entries(linkCfg.autofill)) {
+                currentData[rowIdx][targetCol] = match[sourceCol] ?? '';
+              }
+            }
+            filledCount++;
+            continue;
+          }
+          currentData[rowIdx][key] = cellVal;
+        } else {
+          const origVal = currentData[rowIdx]?.[key];
+          if (typeof origVal === 'number' && cellVal !== '' && !isNaN(Number(cellVal))) {
+            currentData[rowIdx][key] = Number(cellVal);
+          } else if (typeof origVal === 'boolean') {
+            currentData[rowIdx][key] = cellVal.toLowerCase() === 'true';
+          } else {
+            currentData[rowIdx][key] = cellVal;
+          }
+        }
+        filledCount++;
+      }
+    }
+  }
+  isDirty = true;
+  renderTable();
+  setStatus('unsaved', 'Pasted ' + dataRows.length + ' row(s) × ' + Object.keys(headerMap).length + ' col(s)');
+  setTimeout(() => {
+    for (let r = 0; r < dataRows.length; r++) {
+      const tr = document.getElementById('row-' + (targetIdx + r));
+      if (tr) tr.classList.add('paste-highlight');
+    }
+  }, 50);
+}
+
+function sortBy(key) {
+  if (!currentData.length) return;
+  // Toggle: same column → flip direction, new column → asc
+  if (sortColumn === key) {
+    sortDir = sortDir === 1 ? -1 : 1;
+  } else {
+    sortColumn = key;
+    sortDir = 1;
+  }
+  // Sort a copy (don't mutate original until save)
+  currentData.sort((a, b) => {
+    let va = a[key], vb = b[key];
+    // Handle null/undefined/empty → sort to bottom
+    const emptyA = (va === null || va === undefined || va === '');
+    const emptyB = (vb === null || vb === undefined || vb === '');
+    if (emptyA && emptyB) return 0;
+    if (emptyA) return 1;
+    if (emptyB) return -1;
+    // Numeric comparison
+    if (typeof va === 'number' && typeof vb === 'number') {
+      return (va - vb) * sortDir;
+    }
+    // String comparison (case-insensitive)
+    return String(va).localeCompare(String(vb), undefined, { sensitivity: 'base' }) * sortDir;
+  });
+  isDirty = true;
+  renderTable();
+  setStatus('unsaved', 'Sorted by ' + key + (sortDir === 1 ? ' ▲' : ' ▼'));
+}
+
+function addRow() {
+  if (!currentFile) { alert('Select a file first.'); return; }
+  const template = {};
+  if (currentData.length > 0) {
+    for (const key of Object.keys(currentData[0])) {
+      const val = currentData[0][key];
+      template[key] = (typeof val === 'number') ? 0 : (typeof val === 'boolean' ? false : '');
+    }
+  }
+  currentData.push(template);
+  isDirty = true;
+  renderTable();
+  setStatus('unsaved', 'Row added — save to persist');
+  setTimeout(() => {
+    const lastRow = document.querySelector('#row-' + (currentData.length - 1));
+    if (lastRow) {
+      lastRow.classList.add('row-new');
+      lastRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const first = lastRow.querySelector('td[contenteditable], td.dropdown-cell select');
+      if (first) first.focus();
+    }
+  }, 100);
+}
+
+function duplicateRow(idx) {
+  const clone = JSON.parse(JSON.stringify(currentData[idx]));
+  if ('id' in clone) clone.id = clone.id + '_copy';
+  currentData.splice(idx + 1, 0, clone);
+  isDirty = true;
+  renderTable();
+  setStatus('unsaved', 'Row duplicated');
+}
+
+function deleteRow(idx) {
+  if (!confirm('Delete row ' + (idx + 1) + '?')) return;
+  currentData.splice(idx, 1);
+  isDirty = true;
+  renderTable();
+  setStatus('unsaved', 'Row deleted');
+}
+
+function confirmDeleteSelected() {
+  const checks = document.querySelectorAll('.row-check:checked');
+  if (!checks.length) { alert('No rows selected.'); return; }
+  if (!confirm('Delete ' + checks.length + ' selected row(s)?')) return;
+  const indices = [...checks].map(cb => parseInt(cb.dataset.index)).sort((a,b) => b - a);
+  for (const idx of indices) currentData.splice(idx, 1);
+  isDirty = true;
+  renderTable();
+  setStatus('unsaved', indices.length + ' row(s) deleted');
+}
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.row-check').forEach(rc => { rc.checked = cb.checked; });
+}
+
+async function saveData() {
+  if (!currentFile) return;
+  setStatus('', 'Saving...');
+  try {
+    const resp = await fetch('/api/data/' + encodeURIComponent(currentFile), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentData),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).error || 'Save failed');
+    originalData = JSON.parse(JSON.stringify(currentData));
+    isDirty = false;
+    const result = await resp.json();
+    setStatus('saved', 'Saved ' + result.count + ' rows to ' + currentFile);
+    updateStatusDot();
+  } catch (err) {
+    setStatus('error', 'Save failed: ' + err.message);
+  }
+}
+
+function exportCSV() {
+  if (!currentData.length) return;
+  const keys = Object.keys(currentData[0] || {});
+  const csvRows = [keys.join(',')];
+  for (const row of currentData) {
+    const vals = keys.map(k => {
+      let v = row[k];
+      if (v === null || v === undefined) return '';
+      v = String(v).replace(/"/g, '""');
+      return /[,"\n]/.test(v) ? '"' + v + '"' : v;
+    });
+    csvRows.push(vals.join(','));
+  }
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = currentFile.replace('.json', '.csv');
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    if (currentFile && currentData.length > 0) { e.preventDefault(); showSearchBar(); }
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveData(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n') { e.preventDefault(); addRow(); }
+});
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function setStatus(type, msg) {
+  document.getElementById('statusText').textContent = msg;
+  updateStatusDot();
+}
+
+function updateStatusDot() {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot';
+  if (isDirty) dot.classList.add('unsaved');
+  else dot.classList.add('saved');
+}
+
+window.addEventListener('beforeunload', e => {
+  if (isDirty) e.preventDefault();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  ROW-LEVEL LOCK — single-click locks to a row, dbl-click to switch
+// ═══════════════════════════════════════════════════════════════
+
+function lockToRow(idx) {
+  if (activeRowIdx === idx) return; // already locked to this row
+  activeRowIdx = idx;
+  // Update all rows: only the active row gets editable cells
+  document.querySelectorAll('tr[id^=\"row-\"]').forEach(tr => {
+    const rowIdx = parseInt(tr.dataset.index);
+    const isActive = (rowIdx === idx);
+    tr.classList.toggle('row-selected', isActive);
+    tr.querySelectorAll('td[contenteditable]').forEach(td => {
+      td.contentEditable = isActive ? 'true' : 'false';
+      if (!isActive) td.blur();
+    });
+  });
+  // Update status bar
+  const row = currentData[idx];
+  const label = row ? (row.title || row.name || '') : '';
+  if (label) {
+    setStatus('saved', '🔒 Locked to row ' + (idx + 1) + ' — ' + label.substring(0, 40));
+  } else {
+    setStatus('saved', '🔒 Locked to row ' + (idx + 1));
+  }
+  selectedRowIdx = idx;
+  tagMonitorActiveRow = idx;
+  if (currentFile === 'places.json') renderTagMonitor();
+}
+
+// Row selection tracking for tag monitor targeting
+let selectedRowIdx = -1;
+document.addEventListener('click', function(e) {
+  const tr = e.target.closest('tr[id^=\"row-\"]');
+  if (!tr) return;
+  const idx = parseInt(tr.dataset.index);
+  // Single-click: lock to this row (prevents accidental switches)
+  lockToRow(idx);
+});
+
+// Double-click on a different row to switch
+document.addEventListener('dblclick', function(e) {
+  const tr = e.target.closest('tr[id^=\"row-\"]');
+  if (!tr) return;
+  const idx = parseInt(tr.dataset.index);
+  // Always allow double-click to switch rows
+  if (idx !== activeRowIdx) {
+    lockToRow(idx);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  TAG MONITOR RESIZE — drag to change height
+// ═══════════════════════════════════════════════════════════════
+(function() {
+  let resizeActive = false, resizeStartY = 0, resizeStartH = 0;
+  const panel = document.getElementById('tagMonitor');
+  const handle = document.getElementById('tagMonitorResize');
+
+  handle.addEventListener('mousedown', function(e) {
+    resizeActive = true;
+    resizeStartY = e.clientY;
+    resizeStartH = panel.offsetHeight;
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!resizeActive) return;
+    const dy = resizeStartY - e.clientY;
+    const newH = Math.max(80, Math.min(window.innerHeight * 0.6, resizeStartH + dy));
+    panel.style.height = newH + 'px';
+    document.body.style.paddingBottom = (newH + 50) + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (resizeActive) {
+      resizeActive = false;
+      document.body.style.userSelect = '';
+    }
+  });
+})();
+
+// ═══════════════════════════════════════════════════════════════
+//  TAG MONITOR — bottom panel showing all tags with usage counts
+// ═══════════════════════════════════════════════════════════════
+let tagCounts = {}; // tag → count
+let tagMonitorActiveRow = -1;
+
+function buildTagCounts() {
+  tagCounts = {};
+  if (currentFile !== 'places.json' || !currentData.length) return;
+  for (const row of currentData) {
+    const raw = (row.tags || '').toString();
+    if (!raw.trim()) continue;
+    for (const t of raw.split(',')) {
+      const tag = t.trim().toLowerCase();
+      if (tag) tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    }
+  }
+}
+
+function renderTagMonitor() {
+  buildTagCounts();
+  const list = document.getElementById('tagMonitorList');
+  const sorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) {
+    list.innerHTML = '<span style="color:var(--text-muted);padding:8px">No tags yet — add some in the Tags column above.</span>';
+    return;
+  }
+
+  // Get selected row's tags to show them first
+  let selectedTags = [];
+  if (tagMonitorActiveRow >= 0 && currentData[tagMonitorActiveRow]) {
+    const raw = (currentData[tagMonitorActiveRow].tags || '').toString();
+    selectedTags = raw.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  }
+
+  // Sort: selected row's tags first (preserving their order), then rest alphabetically
+  const selectedSet = new Set(selectedTags);
+  const priority = selectedTags.filter(t => tagCounts[t]); // only tags that exist in counts
+  const rest = sorted.filter(([tag]) => !selectedSet.has(tag)).sort((a, b) => a[0].localeCompare(b[0]));
+
+  const ordered = [
+    ...priority.map(tag => [tag, tagCounts[tag]]),
+    ...rest
+  ];
+
+  const maxCount = sorted[0][1];
+  list.innerHTML = ordered.map(([tag, count]) => {
+    const hot = count >= maxCount * 0.3 ? ' hot' : '';
+    const isOnRow = selectedSet.has(tag) ? ' active' : '';
+    return '<span class="tag-chip' + hot + isOnRow + '" onclick="insertTag(\'' + escapeHtml(tag).replace(/'/g, "\\'") + '\')" title="Used in ' + count + ' place(s)' + (isOnRow ? ' — already on this row' : '') + '">' +
+      escapeHtml(tag) + '<span class="tag-count">' + count + '</span></span>';
+  }).join('');
+}
+
+function showTagMonitor() {
+  if (currentFile !== 'places.json') return;
+  const panel = document.getElementById('tagMonitor');
+  panel.classList.add('visible');
+  document.body.classList.add('has-tag-monitor');
+  document.getElementById('tagMonitorSearch').value = '';
+  renderTagMonitor();
+}
+
+function hideTagMonitor() {
+  document.getElementById('tagMonitor').classList.remove('visible');
+  document.body.classList.remove('has-tag-monitor');
+}
+
+function filterTagMonitor() {
+  const q = document.getElementById('tagMonitorSearch').value.toLowerCase().trim();
+  const chips = document.querySelectorAll('#tagMonitorList .tag-chip');
+  chips.forEach(chip => {
+    chip.style.display = (!q || chip.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
+
+function insertTag(tag) {
+  // Find the currently focused/active tags cell, or last clicked row
+  let targetTd = document.activeElement;
+  if (!targetTd || !targetTd.classList.contains('tags-free-cell')) {
+    // Try the last known row
+    if (tagMonitorActiveRow >= 0) {
+      targetTd = document.querySelector('td.tags-free-cell[data-index="' + tagMonitorActiveRow + '"]');
+    }
+    if (!targetTd) {
+      // Fall back to first visible tags cell
+      targetTd = document.querySelector('td.tags-free-cell');
+    }
+  }
+  if (!targetTd) return;
+
+  const idx = parseInt(targetTd.dataset.index);
+  let current = currentData[idx].tags || '';
+  const existing = current.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  if (existing.includes(tag)) return; // already there
+
+  if (current.trim()) current += ', ';
+  current += tag;
+  currentData[idx].tags = current;
+  targetTd.textContent = current;
+  isDirty = true;
+  updateStatusDot();
+  setStatus('unsaved', 'Tag "' + tag + '" added to row ' + (idx + 1));
+
+  // Update count
+  buildTagCounts();
+  // Refresh the chip display (update count on the chip)
+  const chips = document.querySelectorAll('#tagMonitorList .tag-chip');
+  chips.forEach(chip => {
+    const chipTag = chip.childNodes[0]?.textContent?.trim();
+    if (chipTag === tag) {
+      const countEl = chip.querySelector('.tag-count');
+      if (countEl) countEl.textContent = tagCounts[tag] || 0;
+    }
+  });
+}
+
+// Track which row was last clicked in the tags column
+document.addEventListener('click', function(e) {
+  const td = e.target.closest('td.tags-free-cell');
+  if (td) tagMonitorActiveRow = parseInt(td.dataset.index);
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  IMAGE PICKER — searchable dropdown for /images/ directory
+// ═══════════════════════════════════════════════════════════════
+let imagePickerTarget = null;
+let allImages = [];
+
+async function loadImageList() {
+  if (allImages.length > 0) return allImages;
+  try {
+    const resp = await fetch('/api/images');
+    allImages = await resp.json();
+  } catch (_) { allImages = []; }
+  return allImages;
+}
+
+function openImagePicker(inputEl) {
+  imagePickerTarget = inputEl;
+  const panel = document.getElementById('imagePicker');
+  const searchInput = document.getElementById('imagePickerSearch');
+  searchInput.value = '';
+  // Position near the input
+  const rect = inputEl.getBoundingClientRect();
+  panel.style.left = Math.min(rect.left, window.innerWidth - 340) + 'px';
+  panel.style.top = Math.min(rect.bottom + 4, window.innerHeight - 380) + 'px';
+  loadImageList().then(() => filterImagePicker());
+  panel.classList.add('visible');
+  setTimeout(() => searchInput.focus(), 50);
+}
+
+function closeImagePicker() {
+  document.getElementById('imagePicker').classList.remove('visible');
+  imagePickerTarget = null;
+}
+
+function filterImagePicker() {
+  const q = document.getElementById('imagePickerSearch').value.toLowerCase();
+  const list = document.getElementById('imagePickerList');
+  const filtered = allImages.filter(img => img.toLowerCase().includes(q));
+  if (!filtered.length) {
+    list.innerHTML = '<div class="image-picker-empty">No images match "' + escapeHtml(q) + '"</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(img =>
+    '<div class="image-picker-item" onclick="selectImage(\'' + escapeHtml(img).replace(/'/g, "\\'") + '\')" title="' + escapeHtml(img) + '">' +
+      '<img class="thumb" src="/images/' + escapeHtml(img) + '" onerror="this.style.display=\'none\'" loading="lazy">' +
+      '<span class="img-name">' + escapeHtml(img) + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+function onImagePickerKeydown(e) {
+  const panel = document.getElementById('imagePicker');
+  if (!panel.classList.contains('visible')) return;
+  if (e.key === 'Escape') { closeImagePicker(); return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); navigateImagePicker(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); navigateImagePicker(-1); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    const active = panel.querySelector('.image-picker-item.active');
+    if (active) active.click();
+  }
+}
+
+function navigateImagePicker(dir) {
+  const items = document.getElementById('imagePickerList').querySelectorAll('.image-picker-item');
+  if (!items.length) return;
+  let activeIdx = -1;
+  items.forEach((it, i) => { if (it.classList.contains('active')) activeIdx = i; });
+  items.forEach(it => it.classList.remove('active'));
+  activeIdx = Math.max(0, Math.min(items.length - 1, activeIdx + dir));
+  items[activeIdx].classList.add('active');
+  items[activeIdx].scrollIntoView({ block: 'nearest' });
+}
+
+function selectImage(filename) {
+  if (imagePickerTarget) {
+    imagePickerTarget.value = filename;
+    onImageCellInput(imagePickerTarget);
+  }
+  closeImagePicker();
+}
+
+function onImageCellInput(inputEl) {
+  const idx = parseInt(inputEl.dataset.index);
+  const key = inputEl.dataset.key;
+  currentData[idx][key] = inputEl.value;
+  isDirty = true;
+  updateStatusDot();
+  setStatus('unsaved', 'Image updated');
+}
+
+function onImageCellKeydown(e, inputEl) {
+  if (e.key === 'Escape') { closeImagePicker(); return; }
+  if (e.key === 'ArrowDown') {
+    // Open picker if not already open
+    const panel = document.getElementById('imagePicker');
+    if (!panel.classList.contains('visible') || imagePickerTarget !== inputEl) {
+      openImagePicker(inputEl);
+    }
+    e.preventDefault();
+    navigateImagePicker(1);
+  }
+}
+
+// Close image picker on outside click
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('imagePicker');
+  if (!panel.classList.contains('visible')) return;
+  if (!e.target.closest('#imagePicker') && !e.target.closest('.image-cell-btn') && !e.target.closest('.image-cell-input')) {
+    closeImagePicker();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTO-MATCH — match places to images by first 7 chars
+// ═══════════════════════════════════════════════════════════════
+let autoMatchData = {}; // title → { filename, source: 'auto'|'confirmed'|'manual' }
+
+async function openAutoMatch() {
+  if (!currentData.length) return;
+  document.getElementById('autoMatchOverlay').classList.add('visible');
+
+  // Get titles from current data
+  const titles = currentData.map(r => r.title || '').filter(Boolean);
+
+  // Fetch auto-matches from server
+  try {
+    const resp = await fetch('/api/auto-match-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titles }),
+    });
+    const data = await resp.json();
+    autoMatchData = {};
+
+    // Also load confirmed matches
+    const mResp = await fetch('/api/image-matches');
+    const confirmed = await mResp.json();
+
+    for (const title of titles) {
+      const currentImg = (currentData.find(r => r.title === title) || {}).image || '';
+      const autoImg = data.matches[title] || '';
+      const confirmedImg = confirmed[title] || '';
+
+      let source = 'none';
+      let suggestedImg = currentImg || '';
+
+      if (confirmedImg) {
+        source = 'confirmed';
+        suggestedImg = confirmedImg;
+      } else if (autoImg && !currentImg) {
+        source = 'auto';
+        suggestedImg = autoImg;
+      } else if (autoImg && currentImg !== autoImg) {
+        source = 'auto';
+        suggestedImg = autoImg;
+      } else if (currentImg) {
+        source = 'manual';
+        suggestedImg = currentImg;
+      }
+
+      autoMatchData[title] = {
+        filename: suggestedImg,
+        source: source,
+        originalImage: currentImg,
+      };
+    }
+
+    renderAutoMatchModal();
+  } catch (err) {
+    document.getElementById('autoMatchBody').innerHTML =
+      '<p style="color:var(--danger);padding:20px">Failed to load matches: ' + escapeHtml(err.message) + '</p>';
+  }
+}
+
+function closeAutoMatch() {
+  document.getElementById('autoMatchOverlay').classList.remove('visible');
+  autoMatchData = {};
+}
+
+async function renderAutoMatchModal() {
+  const body = document.getElementById('autoMatchBody');
+  const images = await loadImageList();
+  const entries = Object.entries(autoMatchData);
+
+  // Stats
+  let autoCount = 0, confirmedCount = 0, emptyCount = 0;
+  entries.forEach(([_, v]) => {
+    if (v.source === 'confirmed') confirmedCount++;
+    else if (v.source === 'auto') autoCount++;
+    if (!v.originalImage && !v.filename) emptyCount++;
+  });
+  document.getElementById('matchStats').innerHTML =
+    '<span>🔁 <strong>' + autoCount + '</strong> auto-suggested</span>' +
+    '<span>✅ <strong>' + confirmedCount + '</strong> confirmed</span>' +
+    '<span>📭 <strong>' + emptyCount + '</strong> still empty</span>';
+
+  // Build image options <option> list
+  const imgOptions = images.map(img =>
+    '<option value="' + escapeHtml(img) + '">' + escapeHtml(img) + '</option>'
+  ).join('');
+
+  body.innerHTML = entries.map(([title, info]) => {
+    const badgeClass = info.source === 'confirmed' ? 'confirmed' :
+                       info.source === 'auto' ? 'auto' : 'manual';
+    const badgeText = info.source === 'confirmed' ? '✓ confirmed' :
+                      info.source === 'auto' ? '⟳ suggested' : '✎ manual';
+    const selectClass = info.source === 'confirmed' ? 'matched' :
+                        info.source === 'auto' && info.filename ? 'matched' :
+                        !info.filename ? 'unmatched' : '';
+    const previewSrc = info.filename ? '/images/' + info.filename : '';
+
+    return '<div class="match-row">' +
+      '<span class="match-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
+      '<span class="match-badge ' + badgeClass + '">' + badgeText + '</span>' +
+      '<span class="match-arrow">→</span>' +
+      (previewSrc ? '<img class="match-preview" src="' + previewSrc + '" onerror="this.style.display=\'none\'" loading="lazy">' : '<span style="width:28px"></span>') +
+      '<select class="match-select ' + selectClass + '" data-title="' + escapeHtml(title).replace(/"/g, '&quot;') + '" onchange="onMatchSelectChange(this)">' +
+        '<option value="">— no image —</option>' +
+        imgOptions.replace('value="' + escapeHtml(info.filename) + '"', 'value="' + escapeHtml(info.filename) + '" selected') +
+      '</select>' +
+    '</div>';
+  }).join('');
+
+  if (!entries.length) {
+    body.innerHTML = '<p style="padding:20px;color:var(--text-muted)">No places found with titles to match.</p>';
+  }
+}
+
+function onMatchSelectChange(selectEl) {
+  const title = selectEl.dataset.title;
+  const newVal = selectEl.value;
+  if (autoMatchData[title]) {
+    autoMatchData[title].filename = newVal;
+    autoMatchData[title].source = 'manual';
+    selectEl.className = 'match-select' + (newVal ? ' matched' : ' unmatched');
+    // Update badge
+    const row = selectEl.closest('.match-row');
+    const badge = row.querySelector('.match-badge');
+    badge.className = 'match-badge manual';
+    badge.textContent = '✎ manual';
+    // Update preview
+    const preview = row.querySelector('.match-preview');
+    if (preview) preview.src = newVal ? '/images/' + newVal : '';
+  }
+}
+
+async function applyAutoMatches() {
+  const newConfirmed = {};
+  let appliedCount = 0;
+
+  for (const [title, info] of Object.entries(autoMatchData)) {
+    if (info.filename && info.source !== 'confirmed') {
+      newConfirmed[title] = info.filename;
+    }
+    // Apply to current data
+    const row = currentData.find(r => r.title === title);
+    if (row && info.filename && row.image !== info.filename) {
+      row.image = info.filename;
+      appliedCount++;
+    }
+  }
+
+  // Save confirmed matches to server
+  if (Object.keys(newConfirmed).length > 0) {
+    try {
+      await fetch('/api/image-matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfirmed),
+      });
+    } catch (_) {}
+  }
+
+  if (appliedCount > 0) {
+    isDirty = true;
+    renderTable();
+    setStatus('unsaved', appliedCount + ' image(s) auto-matched — save to persist');
+  }
+
+  closeAutoMatch();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  IN-APP SEARCH — filter table rows in real-time
+// ═══════════════════════════════════════════════════════════════
+
+function showSearchBar() {
+  const wrap = document.getElementById('searchWrap');
+  wrap.style.display = 'flex';
+  document.getElementById('searchInput').focus();
+  document.getElementById('searchInput').select();
+}
+
+function onSearchInput() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const countEl = document.getElementById('searchCount');
+  let visibleCount = 0;
+
+  if (!q) {
+    // Show all rows
+    document.querySelectorAll('#tableBody tr').forEach(tr => {
+      tr.style.display = '';
+    });
+    countEl.textContent = '';
+    return;
+  }
+
+  document.querySelectorAll('#tableBody tr').forEach(tr => {
+    const text = tr.textContent.toLowerCase();
+    if (text.includes(q)) {
+      tr.style.display = '';
+      visibleCount++;
+    } else {
+      tr.style.display = 'none';
+    }
+  });
+
+  const total = currentData.length;
+  countEl.textContent = visibleCount + '/' + total;
+}
+
+function onSearchKeydown(e) {
+  if (e.key === 'Escape') {
+    document.getElementById('searchInput').value = '';
+    onSearchInput();
+    document.getElementById('searchWrap').style.display = 'none';
+    // Refocus table
+    const firstCell = document.querySelector('td[contenteditable], td.image-cell-td input');
+    if (firstCell) firstCell.focus();
+  }
+}
+
+// Ctrl+F → custom in-app search (already handled in main keyboard listener above)
+
+// Show/hide auto-match button, search bar, and tag monitor — hooked after renderTable
+const _origRenderTable = renderTable;
+renderTable = function() {
+  _origRenderTable();
+  // Reset row lock when table re-renders
+  activeRowIdx = -1;
+  // File-specific toolbar updates
+  const btn = document.getElementById('autoMatchBtn');
+  if (btn) btn.style.display = (currentFile === 'places.json') ? '' : 'none';
+  document.getElementById('searchWrap').style.display = 'none';
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchCount').textContent = '';
+  // Tag monitor for places.json
+  if (currentFile === 'places.json') {
+    showTagMonitor();
+  } else {
+    hideTagMonitor();
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  BLOG EDITOR — content writer for RoamWeb articles
+// ═══════════════════════════════════════════════════════════════
+let blogCurrentSlug = null;
+let blogCurrentDate = null;
+let blogHeroFile = null; // current hero image filename
+
+function openBlogEditor() {
+  document.querySelector('.table-wrapper').style.display = 'none';
+  document.getElementById('descBar').classList.add('hidden');
+  document.getElementById('tagMonitor').classList.remove('visible');
+  document.body.classList.remove('has-tag-monitor');
+  document.getElementById('autoMatchBtn').style.display = 'none';
+  document.getElementById('blogEditor').classList.add('visible');
+  document.getElementById('currentFile').textContent = '📝 Blog Editor';
+  document.getElementById('rowCount').textContent = '';
+  setStatus('saved', 'Blog editor ready');
+  document.querySelectorAll('.file-tab').forEach(b => b.classList.remove('active'));
+  const blogTab = document.querySelector('.file-tab[data-file="__blog__"]');
+  if (blogTab) blogTab.classList.add('active');
+  blogLoadList();
+}
+
+function blogAutoSlug() {
+  if (blogCurrentSlug) return;
+  const headline = document.getElementById('blogHeadline').value;
+  const slug = headline.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'untitled';
+  document.getElementById('blogSlug').value = slug;
+}
+
+function blogPreview() {
+  const body = document.getElementById('blogBody').value;
+  const headline = document.getElementById('blogHeadline').value || 'Article Preview';
+  const subheadline = document.getElementById('blogSubheadline').value || '';
+  const tag = document.getElementById('blogTag').value || '';
+  const slug = document.getElementById('blogSlug').value || 'preview';
+  const preview = document.getElementById('blogPreview');
+  
+  if (!body.trim()) {
+    preview.innerHTML = '<div class="empty-preview">👁️ Live preview will appear here as you type…</div>';
+    return;
+  }
+  
+  const lines = body.split('\n');
+  const parts = [];
+  let para = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const s = line.trim();
+    if (/^\[img:(.+?)\]$/.test(s)) {
+      if (para.length) { parts.push('<p>' + para.join(' ') + '</p>'); para = []; }
+      const fn = s.match(/^\[img:(.+?)\]$/)[1];
+      let cap = '';
+      if (i + 1 < lines.length) {
+        const nl = lines[i + 1].trim();
+        if (nl && !nl.startsWith('##') && !nl.startsWith('[img:') && !nl.startsWith('<place>')) { cap = nl; i++; }
+      }
+      parts.push('<div class="article-image"><img src="/blog-images/' + slug + '/images/' + escapeHtml(fn) + '" alt="' + escapeHtml(cap) + '" loading="lazy" onerror="this.style.opacity=0.3"><span class="image-caption">' + escapeHtml(cap) + '</span></div>');
+    } else if (/^<place>(.+?)<\/place>$/.test(s)) {
+      if (para.length) { parts.push('<p>' + para.join(' ') + '</p>'); para = []; }
+      const placeName = s.match(/^<place>(.+?)<\/place>$/)[1];
+      // Look up in lookupData
+      let placeInfo = null;
+      if (lookupData['places.json']) {
+        placeInfo = lookupData['places.json'].find(p => (p.title || '').toLowerCase() === placeName.toLowerCase());
+      }
+      if (placeInfo && placeInfo.googleurl) {
+        parts.push('<div style="background:#f0f7ff;border:1px solid #1E6F9F;border-radius:10px;padding:14px 18px;margin:1.2em 0;display:flex;align-items:center;gap:12px">' +
+          '<span style="font-size:1.5rem">📍</span>' +
+          '<div style="flex:1"><strong style="color:#1a2c3e">' + escapeHtml(placeName) + '</strong>' +
+          '<br><span style="font-size:0.85rem;color:#666">' + escapeHtml(placeInfo.location || '') + '</span></div>' +
+          '<span style="background:#1E6F9F;color:white;padding:8px 16px;border-radius:8px;font-size:0.85rem;font-weight:600">🗺 View on Map</span>' +
+        '</div>');
+      } else {
+        parts.push('<div style="background:#fff8f0;border:1px dashed #ccc;border-radius:10px;padding:14px 18px;margin:1.2em 0">' +
+          '<em style="color:#999">📍 ' + escapeHtml(placeName) + '</em>' +
+        '</div>');
+      }
+    } else if (s.startsWith('## ')) {
+      if (para.length) { parts.push('<p>' + para.join(' ') + '</p>'); para = []; }
+      parts.push('<h2>' + escapeHtml(s.slice(3)) + '</h2>');
+    } else if (/^\s*<(\w+)/.test(s)) {
+      if (para.length) { parts.push('<p>' + para.join(' ') + '</p>'); para = []; }
+      parts.push(line);
+    } else if (!s) {
+      if (para.length) { parts.push('<p>' + para.join(' ') + '</p>'); para = []; }
+    } else {
+      para.push(line);
+    }
+    i++;
+  }
+  if (para.length) parts.push('<p>' + para.join(' ') + '</p>');
+  
+  // Wrap in full article template with design.css styling + Disqus placeholder
+  preview.innerHTML = [
+    '<div style="font-family:-apple-system,BlinkMacSystemFont,Inter,sans-serif;max-width:800px;margin:0 auto;color:#2d3748;line-height:1.85;font-size:0.95rem">',
+    '  <div style="text-align:center;margin-bottom:1.5rem">',
+    '    <span style="display:inline-block;background:#FF8C42;color:white;padding:0.25rem 0.8rem;border-radius:20px;font-size:0.7rem;font-weight:700;text-transform:uppercase;margin-bottom:0.5rem">' + escapeHtml(tag) + '</span>',
+    '    <h1 style="font-size:1.8rem;font-weight:800;color:#1a2c3e;line-height:1.2;margin:0.5rem 0">' + escapeHtml(headline) + '</h1>',
+    (subheadline ? '    <p style="font-size:1rem;color:#6c757d;margin:0">' + escapeHtml(subheadline) + '</p>' : ''),
+    '  </div>',
+    '  <div style="background:white;padding:1.5rem;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.06)">',
+    parts.join('\n'),
+    '  </div>',
+    '  <div style="margin-top:1.5rem;background:white;padding:1.2rem;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);text-align:center">',
+    '    <h3 style="color:#1E6F9F;font-size:1rem;margin:0 0 0.5rem">💬 Join the Conversation</h3>',
+    '    <p style="font-size:0.75rem;color:#999;margin:0">Disqus comments — <em>roamanguilla.disqus.com</em></p>',
+    '  </div>',
+    '</div>'
+  ].filter(Boolean).join('\n') || '<div class="empty-preview">👁️ Live preview will appear here as you type…</div>';
+}
+
+async function blogLoadList() {
+  try {
+    const resp = await fetch('/api/blog/articles');
+    const articles = await resp.json();
+    const list = document.getElementById('blogArticleList');
+    if (!articles.length) {
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:0.78rem;padding:8px">No articles yet</div>';
+      return;
+    }
+    list.innerHTML = articles.map(a =>
+      '<div class="blog-article-item" onclick="blogLoadArticle(\'' + escapeHtml(a.slug) + '\')" data-slug="' + escapeHtml(a.slug) + '">' +
+        '<div class="ba-title">' + (a.has_hero ? '🖼 ' : '❌ ') + escapeHtml(a.title) + '</div>' +
+        '<div class="ba-date">' + escapeHtml(a.date) + ' · ' + escapeHtml(a.tag) + '</div>' +
+      '</div>'
+    ).join('');
+  } catch (err) {
+    document.getElementById('blogArticleList').innerHTML = '<div style="color:var(--danger);font-size:0.78rem">Failed to load</div>';
+  }
+}
+
+async function blogLoadArticle(slug) {
+  try {
+    const resp = await fetch('/api/blog/article/' + encodeURIComponent(slug));
+    if (!resp.ok) throw new Error('Not found');
+    const data = await resp.json();
+    document.getElementById('blogHeadline').value = data.title || '';
+    document.getElementById('blogSubheadline').value = data.subheadline || '';
+    document.getElementById('blogSlug').value = data.slug || slug;
+    document.getElementById('blogTag').value = data.tag || 'Travel Tips';
+    document.getElementById('blogBody').value = data.body_html || '';
+    blogCurrentSlug = data.slug;
+    blogCurrentDate = data.date || null;
+    blogPreview();
+    document.querySelectorAll('.blog-article-item').forEach(el => el.classList.remove('active'));
+    const item = document.querySelector('.blog-article-item[data-slug="' + slug.replace(/"/g, '\\"') + '"]');
+    if (item) item.classList.add('active');
+    document.getElementById('blogStatus').textContent = 'Loaded: ' + (data.title || slug);
+  } catch (err) {
+    document.getElementById('blogStatus').textContent = 'Error loading article';
+  }
+}
+
+function blogCreate() {
+  document.getElementById('blogHeadline').value = '';
+  document.getElementById('blogSubheadline').value = '';
+  document.getElementById('blogSlug').value = '';
+  document.getElementById('blogBody').value = '';
+  document.getElementById('blogTag').value = 'Travel Tips';
+  blogCurrentSlug = null;
+  blogCurrentDate = null;
+  blogHeroFile = null;
+  document.getElementById('blogHeroStatus').innerHTML = 'Drop hero image here or click';
+  blogPreview();
+  document.querySelectorAll('.blog-article-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('blogStatus').textContent = 'New article — fill in and publish';
+  document.getElementById('blogHeadline').focus();
+}
+
+async function blogSave() {
+  const headline = document.getElementById('blogHeadline').value.trim();
+  const subheadline = document.getElementById('blogSubheadline').value.trim();
+  const slug = document.getElementById('blogSlug').value.trim();
+  const tag = document.getElementById('blogTag').value;
+  const body = document.getElementById('blogBody').value;
+  const heroImage = blogHeroFile || 'hero.png';
+
+  if (!headline) { alert('Headline is required.'); return; }
+  if (!slug) { alert('Slug is required.'); return; }
+
+  const isUpdate = !!blogCurrentSlug;
+  const url = isUpdate ? '/api/blog/update/' + encodeURIComponent(blogCurrentSlug) : '/api/blog/create';
+  const payload = { headline, subheadline, slug, tag, body, hero_image: heroImage };
+  // Preserve original publish date on updates
+  if (isUpdate && blogCurrentDate) payload.date = blogCurrentDate;
+
+  document.getElementById('blogStatus').textContent = 'Publishing…';
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).error || 'Publish failed');
+    const result = await resp.json();
+    blogCurrentSlug = result.slug;
+    document.getElementById('blogSlug').value = result.slug;
+    document.getElementById('blogStatus').textContent = '✅ Published! ' + result.url;
+    blogLoadList();
+    setStatus('saved', 'Article published to ' + result.full_url);
+  } catch (err) {
+    document.getElementById('blogStatus').textContent = '❌ ' + err.message;
+  }
+}
+
+async function blogUploadHero(file) {
+  if (!file) return;
+  const slug = document.getElementById('blogSlug').value.trim() || blogCurrentSlug || 'untitled';
+  const status = document.getElementById('blogHeroStatus');
+  status.textContent = 'Uploading hero…';
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const resp = await fetch('/api/blog/upload-image/' + encodeURIComponent(slug), { method: 'POST', body: formData });
+    if (!resp.ok) throw new Error('Upload failed');
+    const data = await resp.json();
+    blogHeroFile = data.filename;
+    status.innerHTML = '✅ <strong>' + data.filename + '</strong>' + (data.resized ? ' (resized)' : '') + ' — used as thumbnail';
+  } catch (err) {
+    status.textContent = '❌ ' + err.message;
+  }
+}
+
+async function blogUploadImage(file) {
+  if (!file) return;
+  const slug = document.getElementById('blogSlug').value.trim() || blogCurrentSlug || 'untitled';
+  const status = document.getElementById('blogUploadStatus');
+  status.textContent = 'Uploading…';
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const resp = await fetch('/api/blog/upload-image/' + encodeURIComponent(slug), { method: 'POST', body: formData });
+    if (!resp.ok) throw new Error('Upload failed');
+    const data = await resp.json();
+    status.textContent = '✅ Uploaded: ' + data.filename + (data.resized ? ' (resized)' : '');
+    const bodyEl = document.getElementById('blogBody');
+    const imgTag = '\n[img:' + data.filename + ']\nCaption here\n';
+    const start = bodyEl.selectionStart;
+    bodyEl.value = bodyEl.value.slice(0, start) + imgTag + bodyEl.value.slice(bodyEl.selectionEnd);
+    bodyEl.focus();
+    blogPreview();
+  } catch (err) {
+    status.textContent = '❌ ' + err.message;
+  }
+}
+
+// Drag & drop for blog images (body)
+const _blogDrop = document.getElementById('blogImageDrop');
+if (_blogDrop) {
+  _blogDrop.addEventListener('dragover', e => { e.preventDefault(); _blogDrop.classList.add('drag-over'); });
+  _blogDrop.addEventListener('dragleave', () => _blogDrop.classList.remove('drag-over'));
+  _blogDrop.addEventListener('drop', e => {
+    e.preventDefault();
+    _blogDrop.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) blogUploadImage(file);
+  });
+}
+// Drag & drop for hero image
+const _heroDrop = document.getElementById('blogHeroDrop');
+if (_heroDrop) {
+  _heroDrop.addEventListener('dragover', e => { e.preventDefault(); _heroDrop.classList.add('drag-over'); });
+  _heroDrop.addEventListener('dragleave', () => _heroDrop.classList.remove('drag-over'));
+  _heroDrop.addEventListener('drop', e => {
+    e.preventDefault();
+    _heroDrop.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) blogUploadHero(file);
+  });
+}
+</script>
+</body>
+</html>
