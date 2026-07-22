@@ -2,7 +2,7 @@
   {
     "date": "2026-06-25",
     "description": "Every Sunday from 6pm, <place>Sunset Lounge</place> serves the freshest sushi on the island. <br><br> Don't miss their signature dragon roll and bottomless sake specials. <br><br> <a href='https://roamaxa.app/blog/volunteer-ant/'>Read more on our blog</a>",
-    "image": "https://roamaxa.app/blog/volunteer-ant/hero-image.webp",
+    "image": "https://roamaxa.app/blog/volunteer-ant/images/hero.jpg",
     "subheadline": "Half-off rolls every Sunday evening",
     "tab": "eat",
     "tag": "Sushi",
@@ -10,9 +10,9 @@
     "url": ""
   },
   {
-    "date": "2026-06-25",
+    "date": "https://roamaxa.app/blog/volunteer-ant/images/hero.jpg",
     "description": "Join us August 1-7 for the annual Anguilla Summer Festival. <br><br> Boat racing, live music, food stalls, and the famous J'ouvert morning. <br><br> Featured at <place>Meads Bay Beach</place> and <place>Shoal Bay East</place>. <br><br> <event>SPROCKA @ VEYA RESTAURANT+Veya Restaurant+tuesday</event> kicks things off!",
-    "image": "https://roamaxa.app/blog/volunteer-ant/hero-image.webp",
+    "image": "https://roamaxa.app/blog/volunteer-ant/images/hero.jpg",
     "subheadline": "The biggest beach party of the year",
     "tab": "home",
     "tag": "Festival",
@@ -22,7 +22,7 @@
   {
     "date": "2026-06-25",
     "description": "Chilling at <place>Sandy Ground Beach</place> is usually fun but here are some of our top <place>Anguilla Arch</place> For an adventure or <place>Little Bay</place> for an enchanting afternoon snorkeling between the peaceful yet dramatic cliff-side reefs. <br><br> Includes snorkeling at Little Bay, champagne toast, and fresh tapas. <br><br> <event>TASTY'S POV | CLAYTON CARTY & ACOUSTICS+Tasty's+tuesday</event> this Tuesday!",
-    "image": "https://roamaxa.app/blog/volunteer-ant/hero-image.webp",
+    "image": "https://roamaxa.app/blog/volunteer-ant/images/hero.jpg",
     "subheadline": "These are some of the best ways to spend a lazy Sunday",
     "tab": "activity",
     "tag": "Adventure",

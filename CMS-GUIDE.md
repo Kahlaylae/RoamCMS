@@ -206,7 +206,7 @@ Saturday
 
 | Field | Type | Notes |
 |---|---|---|
-| `name` | string | `ACT_NAME @ PLACE_NAME` |
+| `name` | string | `ACT_NAME @ PLACE_NAME` | We need to infer the Act_Name from the PLace_name and just use the act name
 | `eventday` | string | `sunday`–`saturday` |
 | `eventstart` | float | Decimal hours (17.0 = 5:00 PM) |
 | `eventend` | float | Decimal hours (26.0 = 2 AM next day) |

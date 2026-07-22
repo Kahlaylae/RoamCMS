@@ -7,6 +7,7 @@ View, edit, add, and delete rows in your JSON files through a web interface.
 import json
 import os
 import re
+import subprocess
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
 app = Flask(__name__)
@@ -211,6 +212,7 @@ def api_places_meta():
 # ── Image file listing ────────────────────────────────────────────
 IMAGES_DIR = os.path.join(DATA_DIR, 'images')
 IMAGE_EXTENSIONS = {'.png', '.webp', '.jpg', '.jpeg'}
+ALL_IMAGE_EXTS = {'.png','.webp','.jpg','.jpeg','.gif','.bmp','.tiff','.tif','.heic','.HEIC'}
 
 
 @app.route('/api/images')
@@ -223,6 +225,176 @@ def api_images():
             if ext in IMAGE_EXTENSIONS and os.path.isfile(os.path.join(IMAGES_DIR, f)):
                 images.append(f)
     return jsonify(images)
+
+
+@app.route('/api/images/all')
+def api_images_all():
+    """Scan ALL images across the CMS — ROAMCMS/images/ + RoamWeb/blog/*/images/.
+    Returns list of dicts with metadata plus summary stats."""
+    results = []
+    scan_dirs = [(IMAGES_DIR, 'images/')]
+    # Blog article images
+    if os.path.isdir(BLOG_DIR):
+        for slug in os.listdir(BLOG_DIR):
+            blog_img_dir = os.path.join(BLOG_DIR, slug, 'images')
+            if os.path.isdir(blog_img_dir):
+                scan_dirs.append((blog_img_dir, f'blog/{slug}/images/'))
+
+    for scan_dir, prefix in scan_dirs:
+        if not os.path.isdir(scan_dir):
+            continue
+        for f in sorted(os.listdir(scan_dir)):
+            ext = os.path.splitext(f)[1].lower()
+            if ext not in ALL_IMAGE_EXTS:
+                continue
+            fullpath = os.path.join(scan_dir, f)
+            if not os.path.isfile(fullpath):
+                continue
+            size = os.path.getsize(fullpath)
+            info = {
+                'filename': f,
+                'relpath': prefix + f,
+                'fullpath': fullpath,
+                'size': size,
+                'size_kb': round(size / 1024, 1),
+                'width': 0,
+                'height': 0,
+                'format': ext.lstrip('.'),
+                'broken': False,
+            }
+            try:
+                if HAS_PILLOW:
+                    with Image.open(fullpath) as img:
+                        info['width'], info['height'] = img.size
+                        info['format'] = (img.format or ext.lstrip('.')).lower()
+            except Exception:
+                info['broken'] = True
+            results.append(info)
+
+    results.sort(key=lambda x: x['filename'].lower())
+    total = len(results)
+    total_size = sum(r['size'] for r in results)
+    formats = {}
+    for r in results:
+        fmt = r['format']
+        formats[fmt] = formats.get(fmt, 0) + 1
+    broken = sum(1 for r in results if r['broken'])
+
+    return jsonify({
+        'images': results,
+        'stats': {
+            'total': total,
+            'total_size_kb': round(total_size / 1024, 1),
+            'total_size_mb': round(total_size / (1024 * 1024), 2),
+            'formats': formats,
+            'broken': broken,
+        }
+    })
+
+
+@app.route('/api/images/process', methods=['POST'])
+def api_images_process():
+    """Process images: resize to ≤500px, convert to .jpg, delete originals.
+    Uses Pillow with macOS sips fallback for HEIC/broken files."""
+    data = request.get_json() or {}
+    filenames = data.get('filenames')  # optional whitelist; None = all
+
+    # Collect all images
+    all_resp = api_images_all()
+    all_images = all_resp.json['images']
+    if filenames:
+        all_images = [i for i in all_images if i['filename'] in filenames]
+
+    if not all_images:
+        return jsonify({'error': 'No images found'}), 400
+
+    results = []
+    for info in all_images:
+        fullpath = info['fullpath']
+        base = os.path.splitext(fullpath)[0]
+        jpg_path = base + '.jpg'
+        status = 'skipped'
+        note = ''
+
+        # Already a ≤500px .jpg? Skip
+        if (info['format'] in ('jpg', 'jpeg') and info['width'] > 0
+                and info['width'] <= 500 and info['height'] <= 500
+                and fullpath.lower().endswith('.jpg')):
+            status = 'already_ok'
+            note = 'Already ≤500px .jpg'
+        else:
+            try:
+                img = None
+                opened_with = 'Pillow'
+                try:
+                    if HAS_PILLOW:
+                        img = Image.open(fullpath)
+                        img.load()
+                except Exception:
+                    # macOS fallback: sips handles HEIC, malformed headers, etc.
+                    opened_with = 'sips'
+                    tmp_png = fullpath + '.tmp_convert.png'
+                    subprocess.run(
+                        ['sips', '-s', 'format', 'png', fullpath, '--out', tmp_png],
+                        check=True, capture_output=True, timeout=30)
+                    if os.path.exists(tmp_png) and HAS_PILLOW:
+                        img = Image.open(tmp_png)
+                        img.load()
+
+                if img is None:
+                    raise Exception('Could not open image with any method')
+
+                w, h = img.size
+                largest = max(w, h)
+                if largest > 500 or opened_with == 'sips':
+                    ratio = 500 / largest if largest > 500 else 1.0
+                    new_size = (int(w * ratio), int(h * ratio))
+                    img = img.resize(new_size, Image.LANCZOS)
+                    status = 'resized'
+                else:
+                    status = 'converted'
+
+                # Ensure RGB (handle RGBA, P, LA modes)
+                if img.mode in ('RGBA', 'P', 'LA'):
+                    rgb = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    rgb.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                    img = rgb
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+
+                img.save(jpg_path, 'JPEG', quality=85, optimize=True)
+                note = f'{opened_with}: {w}×{h} → {img.size[0]}×{img.size[1]}'
+
+                # Delete original if extension changed
+                if os.path.abspath(fullpath) != os.path.abspath(jpg_path):
+                    os.remove(fullpath)
+
+                # Clean up temp files
+                for tmp in [fullpath + '.tmp_convert.png']:
+                    if os.path.exists(tmp):
+                        os.remove(tmp)
+
+            except Exception as exc:
+                status = 'failed'
+                note = str(exc)[:120]
+
+        results.append({
+            'filename': info['filename'],
+            'relpath': info['relpath'],
+            'status': status,
+            'note': note,
+        })
+
+    ok = sum(1 for r in results if r['status'] in ('resized', 'converted', 'already_ok'))
+    failed = sum(1 for r in results if r['status'] == 'failed')
+    skipped = sum(1 for r in results if r['status'] == 'skipped')
+
+    return jsonify({
+        'results': results,
+        'summary': {'ok': ok, 'failed': failed, 'skipped': skipped, 'total': len(results)}
+    })
 
 
 # ── Image auto-match persistence ──────────────────────────────────
@@ -361,6 +533,19 @@ def resize_image(filepath, max_dim=500):
         return True
     except Exception:
         return False
+
+
+def resize_blog_images(slug):
+    """Resize all images in a blog article folder to ≤500px."""
+    blog_path = os.path.join(BLOG_DIR, slug)
+    resized = 0
+    for root, dirs, files in os.walk(blog_path):
+        for f in files:
+            ext = os.path.splitext(f)[1].lower()
+            if ext in ('.jpg', '.jpeg', '.png', '.webp'):
+                if resize_image(os.path.join(root, f)):
+                    resized += 1
+    return resized
 
 
 def slugify(text):
@@ -806,6 +991,9 @@ def api_blog_create():
     with open(index_path, 'w', encoding='utf-8') as f:
         f.write(full_html)
     
+    # Batch resize all images in the article folder to ≤500px
+    resized_count = resize_blog_images(slug)
+    
     # Update metadata files
     image_rel = f'/blog/{slug}/{hero_image}' if hero_image else f'/blog/{slug}/hero.png'
     update_content_json(slug, headline, subheadline, description, date_str, tag, image_rel)
@@ -822,6 +1010,7 @@ def api_blog_create():
         'slug': slug,
         'url': f'/blog/{slug}/',
         'full_url': f'https://roamaxa.app/blog/{slug}/',
+        'images_resized': resized_count,
     })
 
 
@@ -857,6 +1046,9 @@ def api_blog_update(slug):
     with open(index_path, 'w', encoding='utf-8') as f:
         f.write(full_html)
     
+    # Batch resize all images in the article folder to ≤500px
+    resized_count = resize_blog_images(slug)
+    
     # Update metadata files
     image_rel = f'/blog/{slug}/{hero_image}' if hero_image else f'/blog/{slug}/hero.jpg'
     update_content_json(slug, headline, subheadline, description, date_str, tag, image_rel)
@@ -873,7 +1065,23 @@ def api_blog_update(slug):
         'slug': slug,
         'url': f'/blog/{slug}/',
         'full_url': f'https://roamaxa.app/blog/{slug}/',
+        'images_resized': resized_count,
     })
+
+
+@app.route('/api/blog/images/<slug>')
+def api_blog_images_list(slug):
+    """List all images in a blog article's folder."""
+    blog_path = os.path.join(BLOG_DIR, slug)
+    images = []
+    if os.path.isdir(blog_path):
+        for root, dirs, files in os.walk(blog_path):
+            for f in sorted(files):
+                ext = os.path.splitext(f)[1].lower()
+                if ext in ('.jpg', '.jpeg', '.png', '.webp', '.gif'):
+                    rel = os.path.relpath(os.path.join(root, f), blog_path)
+                    images.append(rel)
+    return jsonify(images)
 
 
 @app.route('/api/blog/upload-image/<slug>', methods=['POST'])

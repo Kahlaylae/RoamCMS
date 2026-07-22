@@ -79,6 +79,14 @@
   th.sortable { cursor: pointer; user-select: none; }
   th.sortable:hover { color: var(--accent); }
   th.sortable .sort-arrow { color: var(--accent); font-size: 0.7rem; margin-left: 2px; }
+
+  /* ── Draggable Columns ────────────────────── */
+  th.draggable-col { cursor: grab; }
+  th.draggable-col:active { cursor: grabbing; }
+  th.dragging { opacity: 0.35; }
+  th.drag-over-left { box-shadow: inset 3px 0 0 var(--accent); }
+  th.drag-over-right { box-shadow: inset -3px 0 0 var(--accent); }
+
   td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
   td[contenteditable] {
     cursor: text; outline: none; border-radius: 3px; transition: background 0.1s;
@@ -324,6 +332,47 @@
   }
   .image-picker-close:hover { color: var(--danger); }
 
+  /* ── Images Tab (omni view) ──────────────────── */
+  .images-toolbar {
+    display: flex; gap: 8px; align-items: center; padding: 12px 24px;
+    flex-wrap: wrap; border-bottom: 1px solid var(--border);
+  }
+  .images-toolbar span { font-size: 0.8rem; color: var(--text-muted); }
+  .images-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px; padding: 16px 24px;
+  }
+  .image-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; position: relative;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .image-card:hover { border-color: var(--accent); }
+  .image-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .image-card.broken { border-color: var(--danger); }
+  .image-card .img-thumb {
+    width: 100%; height: 140px; object-fit: cover; display: block;
+    background: var(--border);
+  }
+  .image-card .img-thumb.broken-img {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; color: var(--danger); background: rgba(243,139,168,0.1);
+  }
+  .image-card .img-info { padding: 8px 10px; font-size: 0.7rem; }
+  .image-card .img-name { font-weight: 600; font-size: 0.75rem; word-break: break-all; color: var(--text); }
+  .image-card .img-meta { color: var(--text-muted); }
+  .image-card .img-status {
+    position: absolute; top: 6px; right: 6px; font-size: 0.6rem;
+    padding: 2px 6px; border-radius: 8px; font-weight: 600;
+  }
+  .image-card .img-status.ok { background: rgba(166,227,161,0.2); color: var(--success); }
+  .image-card .img-status.broken-stat { background: rgba(243,139,168,0.2); color: var(--danger); }
+  .image-card .img-select {
+    position: absolute; top: 6px; left: 6px; width: 16px; height: 16px;
+    accent-color: var(--accent); cursor: pointer;
+  }
+
   /* ── Auto-Match Modal ──────────────────────────── */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 400;
@@ -543,6 +592,18 @@
   .blog-image-drop:hover, .blog-image-drop.drag-over { border-color: var(--accent); color: var(--accent); }
   .blog-image-drop .drop-icon { font-size: 1.5rem; display: block; margin-bottom: 4px; }
   .blog-upload-status { font-size: 0.72rem; color: var(--success); margin-top: 4px; }
+  .blog-photo-pool {
+    border: 1px solid var(--border); border-radius: 8px;
+    max-height: 130px; overflow-y: auto; padding: 8px;
+    display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0;
+    margin-top: 8px;
+  }
+  .blog-photo-pool img {
+    width: 56px; height: 56px; object-fit: cover; border-radius: 4px;
+    cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s;
+  }
+  .blog-photo-pool img:hover { border-color: var(--accent); }
+  .blog-photo-pool .no-photos { color: var(--text-muted); font-size: 0.72rem; width: 100%; text-align: center; padding: 16px 0; }
 </style>
 </head>
 <body>
@@ -559,6 +620,10 @@
     <button class="btn primary" onclick="addRow()" title="Add a new row (Ctrl+N)">＋ Add Row</button>
     <button class="btn" onclick="saveData()" title="Save changes to disk (Ctrl+S)">💾 Save</button>
     <button class="btn" onclick="exportCSV()" title="Download as CSV">📥 CSV</button>
+    <button class="btn" id="filterHasImg" onclick="filterByImage('has')" style="display:none" title="Show only places with images">🖼 Has Image</button>
+    <button class="btn" id="filterNoImg" onclick="filterByImage('no')" style="display:none" title="Show only places without images">❌ No Image</button>
+    <button class="btn" id="filterUniqueImg" onclick="filterByImage('unique')" style="display:none" title="Show places with a unique image (1 image → 1 place only)">🎯 Unique</button>
+    <button class="btn" id="filterAllImg" onclick="filterByImage('all')" style="display:none" title="Show all places">📋 All</button>
     <button class="btn" id="autoMatchBtn" onclick="openAutoMatch()" title="Auto-match places to images" style="display:none">🖼 Auto-Match</button>
     <button class="btn danger" onclick="confirmDeleteSelected()" title="Delete selected rows">🗑 Delete</button>
   </div>
@@ -582,6 +647,19 @@
       </td></tr>
     </tbody>
   </table>
+</div>
+
+<!-- Images Tab -->
+<div class="images-tab" id="imagesTab" style="display:none">
+  <div class="images-toolbar">
+    <span id="imagesStats"></span>
+    <button class="btn primary" onclick="processAllImages()" title="Resize all images to ≤500px .jpg">🔄 Process All</button>
+    <button class="btn" onclick="processSelectedImages()" title="Process only checked images">🔲 Process Selected</button>
+    <button class="btn" onclick="toggleSelectAllImages()">☐ Select All</button>
+  </div>
+  <div class="images-grid" id="imagesGrid">
+    <p style="padding:40px;text-align:center;color:var(--text-muted)">Loading images…</p>
+  </div>
 </div>
 
 <!-- Bottom Description Editing Bar -->
@@ -687,6 +765,9 @@
           </div>
         </div>
       </div>
+      <div class="blog-photo-pool" id="blogPhotoPool">
+        <div class="no-photos">📸 Article photos appear here — drag images below to add</div>
+      </div>
       <textarea class="blog-body-editor" id="blogBody" placeholder="## Heading&#10;&#10;Write your article here...&#10;&#10;## Another section&#10;More text goes here.&#10;&#10;[img:photo.jpg]&#10;A caption for the photo&#10;&#10;Raw HTML for embeds works too." oninput="blogPreview()"></textarea>
       <div class="blog-image-drop" id="blogImageDrop" onclick="document.getElementById('blogImageInput').click()">
         <span class="drop-icon">📸</span>
@@ -712,6 +793,8 @@ let lookupData = {};
 let allKeys = [];
 let placesMeta = { labels: [], tags: [] };
 let activeRowIdx = -1; // currently locked row (-1 = none)
+let activeCellKey = null;  // currently focused cell's data-key (for copy/paste)
+let activeCellIdx = -1;    // currently focused cell's row index
 let sortColumn = null;  // current sort column key
 let sortDir = 1;        // 1 = asc, -1 = desc
 
@@ -732,14 +815,16 @@ async function loadFileList() {
     const resp = await fetch('/api/files');
     const files = await resp.json();
     // Filter out deprecated files
-    const active = files.filter(f => f !== 'notifications.json');
+    const active = files.filter(f => f !== 'notifications.json' && f !== 'image-matches.json');
     renderFileTabs(active);
     if (active.length > 0) selectFile(active[0]);
   } catch (err) { setStatus('error', 'Failed to load file list'); }
 }
 
 function renderFileTabs(files) {
-  document.getElementById('fileTabs').innerHTML = files.map(f =>
+  document.getElementById('fileTabs').innerHTML =
+    '<button class="file-tab" data-file="__images__" onclick="openImagesTab()">🖼 Images</button>' +
+    files.map(f =>
     `<button class="file-tab" data-file="${f}" onclick="selectFile('${f}')">${f}</button>`
   ).join('') + '<button class="file-tab" data-file="__blog__" onclick="openBlogEditor()" style="border-color:var(--accent);color:var(--accent)">📝 Blog</button>';
 }
@@ -752,6 +837,9 @@ function highlightActiveTab(filename) {
 
 async function selectFile(filename) {
   if (isDirty && !confirm('You have unsaved changes. Discard them?')) return;
+  // Close blog editor if open
+  document.getElementById('blogEditor').classList.remove('visible');
+  document.querySelector('.table-wrapper').style.display = '';
   currentFile = filename;
   highlightActiveTab(filename);
   document.getElementById('currentFile').textContent = filename;
@@ -827,11 +915,20 @@ function renderTable() {
     }
   }
   const fileLinks = linkedColumns[currentFile] || {};
+  // Restore saved column order (new keys append at end)
+  allKeys = applyColumnOrder(allKeys);
   thead.innerHTML = '<tr><th class="col-check"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" title="Select all"></th><th class="col-num">#</th>' +
     allKeys.map(k => {
       let arrow = '';
       if (sortColumn === k) arrow = sortDir === 1 ? ' ▲' : ' ▼';
-      return '<th class="sortable" onclick="sortBy(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\')" title="Click to sort">' + escapeHtml(k) + (fileLinks[k] ? ' 🔗' : '') + '<span class="sort-arrow">' + arrow + '</span></th>';
+      return '<th class="sortable draggable-col" draggable="true" data-col-key="' + escapeHtml(k) + '" ' +
+        'onclick="sortBy(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\')" title="Click to sort · Drag to reorder" ' +
+        'ondragstart="onColDragStart.call(this,event)" ' +
+        'ondragover="onColDragOver.call(this,event)" ' +
+        'ondragleave="onColDragLeave.call(this,event)" ' +
+        'ondrop="onColDrop.call(this,event)" ' +
+        'ondragend="onColDragEnd.call(this,event)">' +
+        escapeHtml(k) + (fileLinks[k] ? ' 🔗' : '') + '<span class="sort-arrow">' + arrow + '</span></th>';
     }).join('') +
     '<th class="col-actions">Actions</th></tr>';
 
@@ -850,6 +947,12 @@ function renderTable() {
   tbody.addEventListener('focusout', onCellBlur);
   tbody.addEventListener('change', onDropdownChange);
   tbody.addEventListener('paste', onPaste);
+  tbody.addEventListener('copy', onCopy);
+  // Track focused cell for single-cell copy/paste
+  tbody.addEventListener('focusin', function(e) {
+    const td = e.target.closest('td[data-key]');
+    if (td) { activeCellKey = td.dataset.key; activeCellIdx = parseInt(td.dataset.index); }
+  });
   // Bottom bar textarea events
   const barTa = document.getElementById('descBarTextarea');
   barTa.addEventListener('input', onBarTextareaInput);
@@ -1340,11 +1443,54 @@ document.addEventListener('click', function(e) {
   }
 });
 
+function onCopy(e) {
+  // Ctrl+C: copy focused cell's text value (works even when locked)
+  const td = document.activeElement?.closest('td[data-key]');
+  if (!td) return;
+  const key = td.dataset.key;
+  const idx = parseInt(td.dataset.index);
+  if (isNaN(idx) || !key || !currentData[idx]) return;
+  let val = currentData[idx][key];
+  if (val === null || val === undefined) val = '';
+  e.clipboardData.setData('text/plain', String(val));
+  e.preventDefault();
+  setStatus('saved', 'Copied ' + key + ' from row ' + (idx + 1));
+}
+
 function onPaste(e) {
   const clipboardData = e.clipboardData;
   if (!clipboardData) return;
   const text = clipboardData.getData('text/plain');
   if (!text) return;
+
+  // ── Single-cell paste: one line, no tabs, focused cell ──
+  const lines_check = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines_check.length === 1 && !lines_check[0].includes('\t')) {
+    const td = document.activeElement?.closest('td[data-key]');
+    if (td) {
+      const key = td.dataset.key;
+      const idx = parseInt(td.dataset.index);
+      if (!isNaN(idx) && key && currentData[idx]) {
+        e.preventDefault();
+        const val = lines_check[0].trim();
+        const origVal = currentData[idx][key];
+        if (typeof origVal === 'number' && val !== '' && !isNaN(Number(val))) {
+          currentData[idx][key] = Number(val);
+        } else if (typeof origVal === 'boolean') {
+          currentData[idx][key] = val.toLowerCase() === 'true';
+        } else {
+          currentData[idx][key] = val || (typeof origVal === 'number' ? 0 : (typeof origVal === 'boolean' ? false : ''));
+        }
+        isDirty = true;
+        updateStatusDot();
+        setStatus('unsaved', 'Pasted into ' + key + ' (row ' + (idx + 1) + ')');
+        renderTable();
+        return;
+      }
+    }
+  }
+
+  // ── Tabular paste (existing logic) ──
   const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
   if (!lines.length) return;
   const rows = lines.map(line => line.split('\t'));
@@ -1432,6 +1578,129 @@ function onPaste(e) {
       if (tr) tr.classList.add('paste-highlight');
     }
   }, 50);
+}
+
+function filterByImage(mode) {
+  if (currentFile !== 'places.json') return;
+
+  // Build unique-image map: image → count of places using it
+  let uniqueSet = null;
+  if (mode === 'unique') {
+    const imgCount = {};
+    for (const row of currentData) {
+      const img = (row.image || '').toString().trim();
+      if (img) imgCount[img] = (imgCount[img] || 0) + 1;
+    }
+    uniqueSet = new Set();
+    for (const [img, count] of Object.entries(imgCount)) {
+      if (count === 1) uniqueSet.add(img);
+    }
+  }
+
+  document.querySelectorAll('#tableBody tr').forEach(tr => {
+    const idx = parseInt(tr.dataset.index);
+    if (isNaN(idx)) return;
+    const row = currentData[idx];
+    const img = (row && row.image) ? String(row.image).trim() : '';
+    if (mode === 'has') tr.style.display = img ? '' : 'none';
+    else if (mode === 'no') tr.style.display = img ? 'none' : '';
+    else if (mode === 'unique') tr.style.display = (img && uniqueSet.has(img)) ? '' : 'none';
+    else tr.style.display = '';
+  });
+  const total = currentData.length;
+  const visible = document.querySelectorAll('#tableBody tr:not([style*="display: none"])').length;
+  document.getElementById('rowCount').textContent = visible + ' / ' + total + ' rows × ' + allKeys.length + ' cols';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DRAGGABLE COLUMNS — drag headers to reorder, persisted per file
+// ═══════════════════════════════════════════════════════════════
+let dragColKey = null;
+
+function getColOrderKey() {
+  return 'colOrder_' + currentFile;
+}
+
+function loadColumnOrder() {
+  try {
+    const saved = localStorage.getItem(getColOrderKey());
+    return saved ? JSON.parse(saved) : null;
+  } catch (_) { return null; }
+}
+
+function saveColumnOrder(order) {
+  try {
+    localStorage.setItem(getColOrderKey(), JSON.stringify(order));
+  } catch (_) {}
+}
+
+function applyColumnOrder(keys) {
+  const saved = loadColumnOrder();
+  if (!saved || !Array.isArray(saved)) return keys;
+  // Start with saved order, keeping only keys that still exist
+  const ordered = saved.filter(k => keys.includes(k));
+  // Append any new keys not in saved order
+  for (const k of keys) {
+    if (!ordered.includes(k)) ordered.push(k);
+  }
+  return ordered;
+}
+
+function onColDragStart(e) {
+  dragColKey = this.dataset.colKey;
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragColKey);
+}
+
+function onColDragOver(e) {
+  e.preventDefault();
+  if (!dragColKey || this.dataset.colKey === dragColKey) return;
+  e.dataTransfer.dropEffect = 'move';
+  // Clear all indicators first
+  document.querySelectorAll('th.drag-over-left, th.drag-over-right').forEach(th => {
+    th.classList.remove('drag-over-left', 'drag-over-right');
+  });
+  // Show indicator on left or right half of the target header
+  const rect = this.getBoundingClientRect();
+  if (e.clientX < rect.left + rect.width / 2) {
+    this.classList.add('drag-over-left');
+  } else {
+    this.classList.add('drag-over-right');
+  }
+}
+
+function onColDragLeave(e) {
+  this.classList.remove('drag-over-left', 'drag-over-right');
+}
+
+function onColDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over-left', 'drag-over-right');
+  if (!dragColKey || this.dataset.colKey === dragColKey) return;
+
+  const targetKey = this.dataset.colKey;
+  const insertBefore = e.clientX < this.getBoundingClientRect().left + this.getBoundingClientRect().width / 2;
+
+  // Remove dragged key from its current position
+  const fromIdx = allKeys.indexOf(dragColKey);
+  if (fromIdx >= 0) allKeys.splice(fromIdx, 1);
+
+  // Find insert position after removal
+  let toIdx = allKeys.indexOf(targetKey);
+  if (!insertBefore) toIdx++;
+
+  allKeys.splice(toIdx, 0, dragColKey);
+  saveColumnOrder(allKeys);
+  renderTable();
+}
+
+function onColDragEnd(e) {
+  this.classList.remove('dragging');
+  document.querySelectorAll('th.drag-over-left, th.drag-over-right').forEach(th => {
+    th.classList.remove('drag-over-left', 'drag-over-right');
+  });
+  dragColKey = null;
 }
 
 function sortBy(key) {
@@ -2156,13 +2425,135 @@ renderTable = function() {
   document.getElementById('searchWrap').style.display = 'none';
   document.getElementById('searchInput').value = '';
   document.getElementById('searchCount').textContent = '';
-  // Tag monitor for places.json
+  // Image filter buttons + tag monitor for places.json
+  document.getElementById('filterHasImg').style.display = (currentFile === 'places.json') ? '' : 'none';
+  document.getElementById('filterNoImg').style.display = (currentFile === 'places.json') ? '' : 'none';
+  document.getElementById('filterUniqueImg').style.display = (currentFile === 'places.json') ? '' : 'none';
+  document.getElementById('filterAllImg').style.display = (currentFile === 'places.json') ? '' : 'none';
   if (currentFile === 'places.json') {
     showTagMonitor();
   } else {
     hideTagMonitor();
   }
 };
+
+// ═══════════════════════════════════════════════════════════════
+//  IMAGES TAB — omni view of all images across the CMS
+// ═══════════════════════════════════════════════════════════════
+let allImagesData = [];
+let selectedImageCards = new Set();
+
+async function openImagesTab() {
+  document.getElementById('fileTabs').querySelectorAll('.file-tab').forEach(b => b.classList.remove('active'));
+  const tab = document.querySelector('[data-file="__images__"]');
+  if (tab) tab.classList.add('active');
+  document.querySelector('.table-wrapper').style.display = 'none';
+  document.getElementById('blogEditor').classList.remove('visible');
+  document.getElementById('imagesTab').style.display = 'block';
+  document.getElementById('descBar').classList.add('hidden');
+  hideTagMonitor();
+  setStatus('', 'Loading all images...');
+  try {
+    const resp = await fetch('/api/images/all');
+    const data = await resp.json();
+    allImagesData = data.images;
+    selectedImageCards.clear();
+    renderImagesGrid();
+    const s = data.stats;
+    document.getElementById('imagesStats').innerHTML =
+      '<strong>' + s.total + '</strong> images · <strong>' + s.total_size_mb + ' MB</strong> · ' +
+      Object.entries(s.formats).map(function(e) { return e[0] + ':' + e[1]; }).join(' ') +
+      (s.broken ? ' · <span style="color:var(--danger)">⚠ ' + s.broken + ' broken</span>' : '');
+    setStatus('saved', s.total + ' images found across CMS');
+  } catch (err) {
+    setStatus('error', err.message);
+    document.getElementById('imagesGrid').innerHTML =
+      '<p style="padding:40px;text-align:center;color:var(--danger)">Failed to load images: ' + escapeHtml(err.message) + '</p>';
+  }
+}
+
+function renderImagesGrid() {
+  const grid = document.getElementById('imagesGrid');
+  if (!allImagesData.length) {
+    grid.innerHTML = '<p style="padding:40px;text-align:center;color:var(--text-muted)">No images found.</p>';
+    return;
+  }
+  grid.innerHTML = allImagesData.map(function(img) {
+    var selected = selectedImageCards.has(img.filename) ? ' selected' : '';
+    var broken = img.broken ? ' broken' : '';
+    var statClass = img.broken ? 'broken-stat' : 'ok';
+    var statText = img.broken ? '⚠ broken' : (img.width ? img.width + '×' + img.height : '?');
+    return '<div class="image-card' + selected + broken + '" data-filename="' + escapeHtml(img.filename) + '" onclick="toggleImageCard(this)">' +
+      '<div class="img-thumb' + (img.broken ? ' broken-img' : '') + '"' + (img.broken ? '' : ' style="background-image:url(/' + img.relpath + ')"') + '>' +
+        (img.broken ? '⚠' : '') +
+      '</div>' +
+      '<span class="img-status ' + statClass + '">' + statText + '</span>' +
+      '<input type="checkbox" class="img-select" ' + (selected ? 'checked' : '') + ' onclick="event.stopPropagation();toggleImageCheckbox(this)">' +
+      '<div class="img-info">' +
+        '<div class="img-name">' + escapeHtml(img.filename) + '</div>' +
+        '<div class="img-meta">' + img.size_kb + ' KB · ' + img.format.toUpperCase() +
+          (img.broken ? ' · <span style="color:var(--danger)">⚠</span>' : '') + '</div>' +
+      '</div></div>';
+  }).join('');
+}
+
+function toggleImageCard(card) {
+  var cb = card.querySelector('.img-select');
+  cb.checked = !cb.checked;
+  toggleImageCheckbox(cb);
+}
+
+function toggleImageCheckbox(cb) {
+  var card = cb.closest('.image-card');
+  var filename = card.dataset.filename;
+  if (cb.checked) {
+    selectedImageCards.add(filename);
+    card.classList.add('selected');
+  } else {
+    selectedImageCards.delete(filename);
+    card.classList.remove('selected');
+  }
+}
+
+function toggleSelectAllImages() {
+  if (selectedImageCards.size === allImagesData.length) {
+    selectedImageCards.clear();
+  } else {
+    allImagesData.forEach(function(img) { selectedImageCards.add(img.filename); });
+  }
+  renderImagesGrid();
+}
+
+async function processAllImages() {
+  if (!confirm('Process ALL ' + allImagesData.length + ' images?\n\nThis will resize to ≤500px and convert all images to .jpg.\nOriginals will be replaced. This cannot be undone.')) return;
+  await doProcess(null);
+}
+
+async function processSelectedImages() {
+  if (!selectedImageCards.size) { alert('Select some images first by clicking them.'); return; }
+  if (!confirm('Process ' + selectedImageCards.size + ' selected images?\n\nResize to ≤500px and convert to .jpg.')) return;
+  await doProcess(Array.from(selectedImageCards));
+}
+
+async function doProcess(filenames) {
+  setStatus('', 'Processing images...');
+  document.getElementById('imagesGrid').style.opacity = '0.5';
+  try {
+    var resp = await fetch('/api/images/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filenames: filenames }),
+    });
+    var data = await resp.json();
+    var s = data.summary;
+    setStatus('saved', 'Processed: ' + s.ok + ' OK · ' + s.failed + ' failed · ' + s.skipped + ' skipped (of ' + s.total + ')');
+    // Reload
+    await openImagesTab();
+  } catch (err) {
+    setStatus('error', 'Process failed: ' + err.message);
+    document.getElementById('imagesGrid').style.opacity = '1';
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  BLOG EDITOR — content writer for RoamWeb articles
@@ -2173,6 +2564,7 @@ let blogHeroFile = null; // current hero image filename
 
 function openBlogEditor() {
   document.querySelector('.table-wrapper').style.display = 'none';
+  document.getElementById('imagesTab').style.display = 'none';
   document.getElementById('descBar').classList.add('hidden');
   document.getElementById('tagMonitor').classList.remove('visible');
   document.body.classList.remove('has-tag-monitor');
@@ -2310,6 +2702,7 @@ async function blogLoadArticle(slug) {
     blogCurrentSlug = data.slug;
     blogCurrentDate = data.date || null;
     blogPreview();
+    blogLoadPhotoPool();
     document.querySelectorAll('.blog-article-item').forEach(el => el.classList.remove('active'));
     const item = document.querySelector('.blog-article-item[data-slug="' + slug.replace(/"/g, '\\"') + '"]');
     if (item) item.classList.add('active');
@@ -2408,9 +2801,45 @@ async function blogUploadImage(file) {
     bodyEl.value = bodyEl.value.slice(0, start) + imgTag + bodyEl.value.slice(bodyEl.selectionEnd);
     bodyEl.focus();
     blogPreview();
+    blogLoadPhotoPool(); // refresh pool with new image
   } catch (err) {
     status.textContent = '❌ ' + err.message;
   }
+}
+
+async function blogLoadPhotoPool() {
+  const slug = document.getElementById('blogSlug').value.trim() || blogCurrentSlug;
+  if (!slug) return;
+  try {
+    const resp = await fetch('/api/blog/images/' + encodeURIComponent(slug));
+    const images = await resp.json();
+    const pool = document.getElementById('blogPhotoPool');
+    if (!images.length) {
+      pool.innerHTML = '<div class=\"no-photos\">📸 No photos yet — drag images below to add</div>';
+      return;
+    }
+    pool.innerHTML = images.map(img =>
+      '<img src=\"/blog-images/' + slug + '/' + img + '\" title=\"' + escapeHtml(img) + ' — click to insert\" data-filename=\"' + escapeHtml(img) + '\" class=\"pool-thumb\" loading=\"lazy\">'
+    ).join('');
+    // Attach click handlers after render to avoid escape hell
+    pool.querySelectorAll('.pool-thumb').forEach(el => {
+      el.addEventListener('click', function() {
+        insertPhotoRef(this.dataset.filename);
+      });
+      el.addEventListener('error', function() {
+        this.style.display = 'none';
+      });
+    });
+  } catch (_) {}
+}
+
+function insertPhotoRef(filename) {
+  const bodyEl = document.getElementById('blogBody');
+  const tag = '\n[img:' + filename + ']\nCaption here\n';
+  const start = bodyEl.selectionStart;
+  bodyEl.value = bodyEl.value.slice(0, start) + tag + bodyEl.value.slice(bodyEl.selectionEnd);
+  bodyEl.focus();
+  blogPreview();
 }
 
 // Drag & drop for blog images (body)
