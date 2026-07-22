@@ -587,7 +587,7 @@ def generate_blog_html(slug, headline, subheadline, tag, body_html, date_str):
     escaped_headline = headline.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
     escaped_sub = (subheadline or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
     hero_img = find_hero_image(slug)
-    hero_filename = hero_img.replace('images/', '')  # for <img> src
+    hero_filename = hero_img  # keep images/ prefix — hero lives in images/ folder
     return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
