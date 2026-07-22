@@ -680,7 +680,7 @@ def update_content_json(slug, headline, subheadline, description, date_str, tag,
         'date': date_str,
         'tag': tag,
         'url': f'/blog/{slug}/',
-        'image': image_path or f'/blog/{slug}/hero.png'
+        'image': image_path or f'/blog/{slug}/images/hero.jpg'
     }
     data, _ = load_json('content.json')
     if not isinstance(data, list):
@@ -719,7 +719,7 @@ def update_webcontent_json(slug, headline, subheadline, description, date_str, t
         'date': date_str,
         'tag': tag,
         'url': f'https://roamaxa.app/blog/{slug}/',
-        'image': image_path or f'https://roamaxa.app/blog/{slug}/hero.png'
+        'image': image_path or f'https://roamaxa.app/blog/{slug}/images/hero.jpg'
     }
     if not entry['subheadline']:
         del entry['subheadline']
@@ -1030,7 +1030,7 @@ def api_blog_create():
     tag = (body.get('tag') or 'Travel Tips').strip()
     slug = (body.get('slug') or slugify(headline)).strip()
     body_text = (body.get('body') or '').strip()
-    hero_image = body.get('hero_image', 'hero.png')
+    hero_image = body.get('hero_image', 'images/hero.jpg')
     
     if not headline:
         return jsonify({'error': 'Headline is required'}), 400
@@ -1058,9 +1058,9 @@ def api_blog_create():
     resized_count = resize_blog_images(slug)
     
     # Update metadata files
-    image_rel = f'/blog/{slug}/{hero_image}' if hero_image else f'/blog/{slug}/hero.png'
+    image_rel = f'/blog/{slug}/{hero_image}' if hero_image else f'/blog/{slug}/hero.jpg'
     update_content_json(slug, headline, subheadline, description, date_str, tag, image_rel)
-    update_webcontent_json(slug, headline, subheadline, description, date_str, tag, image_rel)
+    # webcontent.json is managed manually — not auto-updated from blog publishes
     
     # Regenerate sitemap
     try:
@@ -1093,7 +1093,7 @@ def api_blog_update(slug):
     subheadline = (body.get('subheadline') or '').strip()
     tag = (body.get('tag') or 'Travel Tips').strip()
     body_text = (body.get('body') or '').strip()
-    hero_image = body.get('hero_image', 'hero.png')
+    hero_image = body.get('hero_image', 'images/hero.jpg')
     date_str = body.get('date') or datetime.now().strftime('%B %d, %Y')
     
     if not headline:
@@ -1115,7 +1115,7 @@ def api_blog_update(slug):
     # Update metadata files
     image_rel = f'/blog/{slug}/{hero_image}' if hero_image else f'/blog/{slug}/hero.jpg'
     update_content_json(slug, headline, subheadline, description, date_str, tag, image_rel)
-    update_webcontent_json(slug, headline, subheadline, description, date_str, tag, image_rel)
+    # webcontent.json is managed manually — not auto-updated from blog publishes
     
     # Regenerate sitemap
     try:
