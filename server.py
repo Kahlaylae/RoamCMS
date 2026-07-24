@@ -144,6 +144,19 @@ def api_save_data(filename):
                 row.pop('id', None)
                 if 'location' in row:
                     row['location'] = normalize_location(row['location'])
+                # Normalize image extension: force .jpg (fix .jpeg, .JPG, .png, .webp)
+                if 'image' in row and row['image']:
+                    img = row['image']
+                    lower = img.lower()
+                    if lower.endswith('.jpeg'):
+                        row['image'] = img[:-5] + '.jpg'
+                    elif lower.endswith('.png'):
+                        row['image'] = img[:-4] + '.jpg'
+                    elif lower.endswith('.webp'):
+                        row['image'] = img[:-5] + '.jpg'
+                    elif lower.endswith('.jpg') and not img.endswith('.jpg'):
+                        # Case mismatch: .JPG or .Jpg → .jpg
+                        row['image'] = img[:-4] + '.jpg'
             # Normalize tags: trim, lowercase, deduplicate within row
             if isinstance(row, dict) and 'tags' in row:
                 raw = row.get('tags', '')
@@ -179,9 +192,17 @@ def api_save_data(filename):
                     # Inject images/ into the path
                     slug = row.get('url', '').rstrip('/').split('/')[-1]
                     row['image'] = img.replace(f'/{slug}/', f'/{slug}/images/')
-                # Also fix .png → .jpg
-                if row['image'].endswith('.png'):
-                    row['image'] = row['image'][:-4] + '.jpg'
+                # Normalize image extension: .jpeg/.png/.webp/.JPG → .jpg
+                img = row['image']
+                lower = img.lower()
+                if lower.endswith('.jpeg'):
+                    row['image'] = img[:-5] + '.jpg'
+                elif lower.endswith('.png'):
+                    row['image'] = img[:-4] + '.jpg'
+                elif lower.endswith('.webp'):
+                    row['image'] = img[:-5] + '.jpg'
+                elif lower.endswith('.jpg') and not img.endswith('.jpg'):
+                    row['image'] = img[:-4] + '.jpg'
 
     # Event duplicate detection
     warnings = []
@@ -255,16 +276,12 @@ def api_images():
 
 @app.route('/api/images/all')
 def api_images_all():
-    """Scan ALL images across the CMS — ROAMCMS/images/ + RoamWeb/blog/*/images/.
-    Returns list of dicts with metadata plus summary stats."""
+    """Scan images from ROAMCMS/images/ directory only.
+    Blog article images are NOT included — they live in RoamWeb/blog/*/images/
+    and show as blank in the CMS because the relative paths don't resolve here."""
     results = []
+    # Only scan the main images/ directory (used by places.json, events.json, etc.)
     scan_dirs = [(IMAGES_DIR, 'images/')]
-    # Blog article images
-    if os.path.isdir(BLOG_DIR):
-        for slug in os.listdir(BLOG_DIR):
-            blog_img_dir = os.path.join(BLOG_DIR, slug, 'images')
-            if os.path.isdir(blog_img_dir):
-                scan_dirs.append((blog_img_dir, f'blog/{slug}/images/'))
 
     for scan_dir, prefix in scan_dirs:
         if not os.path.isdir(scan_dir):
