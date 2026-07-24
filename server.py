@@ -157,6 +157,9 @@ def api_save_data(filename):
                     elif lower.endswith('.jpg') and not img.endswith('.jpg'):
                         # Case mismatch: .JPG or .Jpg → .jpg
                         row['image'] = img[:-4] + '.jpg'
+                # Normalize spaces in image filenames — iOS URL(string:) fails on spaces
+                if 'image' in row and row['image'] and ' ' in row['image']:
+                    row['image'] = row['image'].replace(' ', '-')
             # Normalize tags: trim, lowercase, deduplicate within row
             if isinstance(row, dict) and 'tags' in row:
                 raw = row.get('tags', '')
