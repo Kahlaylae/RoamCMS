@@ -1386,7 +1386,7 @@ function showAutocompletePopup(el, suggestions, popup) {
   popup.style.top = (rect.bottom + 4) + 'px';
   popup.style.minWidth = Math.max(rect.width, 200) + 'px';
   popup.innerHTML = suggestions.map((s, i) =>
-    '<div class="autocomplete-item" data-idx="' + i + '" onmousedown="selectAutocompleteItem(' + i + ', null, null)">' +
+    '<div class="autocomplete-item" data-idx="' + i + '" data-value="' + escapeHtml(s.value) + '" onmousedown="selectAutocompleteItem(' + i + ', null, null)">' +
       '<span class="ac-icon">' + (acTrigger === 'place' ? '📍' : '🗓️') + '</span> ' +
       escapeHtml(s.label) +
       (s.sub ? '<span class="ac-sub">' + escapeHtml(s.sub) + '</span>' : '') +
@@ -1410,42 +1410,37 @@ function selectAutocompleteItem(idx, sourceEl, popup) {
   if (idx < 0 || idx >= items.length) return;
 
   const item = items[idx];
-  const valueEl = item.querySelector('.ac-sub');
-  // Get the value from our suggestions directly
-  let suggestions;
-  if (acTrigger === 'place') suggestions = getPlaceSuggestions('');
-  else suggestions = getEventSuggestions('');
+  // Read the actual value stored on the DOM element — not from a re-fetched list
+  const selValue = item.getAttribute('data-value');
+  if (!selValue) return;
 
-  if (idx < suggestions.length) {
-    const sel = suggestions[idx];
-    const el = sourceEl || document.activeElement;
-    if (!el) return;
-    if (el.tagName === 'TEXTAREA') {
-      const text = el.value;
-      const tag = acTrigger === 'place' ? '<place>' : '<event>';
-      const tagIdx = text.lastIndexOf(tag);
-      if (tagIdx >= 0) {
-        const before = text.substring(0, tagIdx);
-        el.value = before + tag + sel.value;
-        el.selectionStart = el.selectionEnd = el.value.length;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    } else if (el.contentEditable === 'true' || el.isContentEditable) {
-      const text = el.textContent || '';
-      const tag = acTrigger === 'place' ? '<place>' : '<event>';
-      const tagIdx = text.lastIndexOf(tag);
-      if (tagIdx >= 0) {
-        const before = text.substring(0, tagIdx);
-        el.textContent = before + tag + sel.value;
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        range.collapse(false);
-        const sel2 = window.getSelection();
-        sel2.removeAllRanges();
-        sel2.addRange(range);
-      }
-      updateBarPreview(el.textContent || '');
+  const el = sourceEl || document.activeElement;
+  if (!el) return;
+  if (el.tagName === 'TEXTAREA') {
+    const text = el.value;
+    const tag = acTrigger === 'place' ? '<place>' : '<event>';
+    const tagIdx = text.lastIndexOf(tag);
+    if (tagIdx >= 0) {
+      const before = text.substring(0, tagIdx);
+      el.value = before + tag + selValue;
+      el.selectionStart = el.selectionEnd = el.value.length;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
     }
+  } else if (el.contentEditable === 'true' || el.isContentEditable) {
+    const text = el.textContent || '';
+    const tag = acTrigger === 'place' ? '<place>' : '<event>';
+    const tagIdx = text.lastIndexOf(tag);
+    if (tagIdx >= 0) {
+      const before = text.substring(0, tagIdx);
+      el.textContent = before + tag + selValue;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel2 = window.getSelection();
+      sel2.removeAllRanges();
+      sel2.addRange(range);
+    }
+    updateBarPreview(el.textContent || '');
   }
   popup.classList.remove('visible');
   acTrigger = null;

@@ -355,3 +355,28 @@ Browser (index.html)
 | Place link shows red | Place not in `places.json` — add it first |
 | Changes not saving | Click `💾 Save` or `Ctrl+S` |
 | App won't open | Use `.command` file instead; check `python3` and `flask` are installed |
+
+
+-----------
+## 12. Event Scraper — Copilot Process
+
+User drops an RTF (or plain text) with weekly events. Copilot handles everything directly — **no new Python scripts, no tools, no parsers.**
+
+### Process
+
+1. **Read the RTF** — the user attaches it. Copilot reads it inline. Format is messy: RTF tags, inconsistent pipe separators, weird time formats. That's fine — Copilot has eyes.
+2. **Parse manually** — group by day header (Monday–Sunday), extract each event line, split on `|` to get venue, location hint, artist, time range.
+3. **Match venues to places.json** — look up each venue name against `places.json` titles. Common aliases Copilot already knows (Bohio Lounge → Bohio Bar & Lounge @ Zemi, Dune Preserve → Bankie Banx's Dune Preserve, etc.).
+4. **Convert times** — `6:30 PM` → `18.5`, `SUNSET` → `19.0`, `UNTIL` → `start + 3h`, overnight events add 24h.
+5. **Write events.json directly** — Copilot uses `create_file` or terminal to write the JSON. Each event gets: `name` (ARTIST @ Venue), `eventday`, `eventstart`, `eventend`, `place` (matched title), `placeurl` (from places.json).
+6. **Delete old events first** — clear `events.json` to `[]` before writing new ones. Full replace, not merge.
+7. **Track artists in memory** — save to `/memories/repo/artist-tracking.md` with counts per artist, per venue, per day. Compare week-over-week.
+
+### Copilot's Rules
+
+- **NO scripts.** Do not write `build_events.py`, `parse_events.py`, or any automation. Just do the work directly.
+- **NO regex over-engineering.** Read the RTF like a human. If a line is weird, figure it out from context.
+- **Use the CMS.** The JSON Table Editor at `http://localhost:5050` is the source of truth for places/events. Copilot edits the JSON files directly.
+- **Match venues carefully.** If a venue doesn't match, search `places.json` for partial matches before giving up. Ask the user if truly stuck.
+- **Name format:** `"ARTIST NAME @ Venue Name"` — artist first, @, venue second.
+- **Validate:** after writing, verify all 7 days have events, no empty artists, all places matched.

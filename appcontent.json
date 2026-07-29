@@ -1,7 +1,7 @@
 [
   {
     "date": "2026-06-25",
-    "description": "Every Sunday from 6pm, <place>Sunset Lounge</place> serves the freshest sushi on the island. <br><br> Don't miss their signature dragon roll and bottomless sake specials. <br><br> <a href='https://roamaxa.app/blog/volunteer-ant/'>Read more on our blog</a>\nAnguilla has some of the best BBQ street food in the Caribbean? Smokey, juicy and bursting with flavour, here are some of our sweet picks for the best BBQ on island.\n<place>Grilled Spot BBQ</place>\n<place>Albert Lake Marketplace</place>",
+    "description": "Anguilla has some of the best BBQ street food in the Caribbean? Smokey, juicy and bursting with flavour, here are some of our sweet picks for the best BBQ on island.\n<place>Grilled Spot BBQ</place>\n<place>Ken's BBQ</place>\n<place>Pope Bbq</place>\n<place>B & D's BBQ</place>",
     "image": "https://ethicalbutcher.co.uk/cdn/shop/articles/what-is-bbq_0f2f047b-5e2b-4cc8-be32-8eee5955ab4c.jpg?v=1757434858&width=500",
     "subheadline": "Our list of top BBQ take out on the island.",
     "tab": "eat",
@@ -10,9 +10,9 @@
     "url": ""
   },
   {
-    "date": "https://roamaxa.app/blog/volunteer-ant/images/hero.jpg",
-    "description": "Join us August 1-7 for the annual Anguilla Summer Festival. <br><br> Boat racing, live music, food stalls, and the famous J'ouvert morning. <br><br> Featured at <place>Meads Bay Beach</place> and <place>Shoal Bay East</place>. <br><br> <event>SPROCKA @ VEYA RESTAURANT+Veya Restaurant+tuesday</event> kicks things off!",
-    "image": "https://roamaxa.app/blog/volunteer-ant/images/hero.jpg",
+    "date": "2026-07-25",
+    "description": "The Summer Festival and this year is gearing up to be unforgettable! From the experimental soca sounds to the piping hot street foods, this years the party never ends with ends that span the entire week. Below is our list of the most go-to venues for Summer Festival Events. \n<place>Landsome Bowl Cultural Centre</place>\n\n<place>Sandy Ground Beach</place>\n\n<place>Meads Bay Beach</place>\n\nFor a full run down of carnival events you can also read more over on our <a href=\"https://roamaxa.app/blog/summer-festival-2026/\">Blog</a>",
+    "image": "https://roamaxa.app/blog/summer-festival-2026/images/pageants.jpg",
     "subheadline": "The biggest beach party of the year",
     "tab": "home",
     "tag": "Festival",
@@ -21,12 +21,32 @@
   },
   {
     "date": "2026-06-25",
-    "description": "Chilling at <place>Sandy Ground Beach</place> is usually fun but here are some of our top <place>Anguilla Arch</place> For an adventure or <place>Little Bay</place> for an enchanting afternoon snorkeling between the peaceful yet dramatic cliff-side reefs. <br><br> Includes snorkeling at Little Bay, champagne toast, and fresh tapas. <br><br> <event>TASTY'S POV | CLAYTON CARTY & ACOUSTICS+Tasty's+tuesday</event> this Tuesday!",
-    "image": "https://roamaxa.app/blog/volunteer-ant/images/hero.jpg",
-    "subheadline": "These are some of the best ways to spend a lazy Sunday",
+    "description": "Anguilla's beaches aren't just breathtaking above ground. Sometimes their true beauty rests beneath their topaz waves. Here's a list of some of our best snorkelling locations on Anguilla. \n<place>Crocus Bay Beach</place>\n\n<place>Little Bay</place>\n\n<place>Katouche Bay</place> \n\n<place>Shoal Bay West</place>\n\n<place>Sherricks Bay</place> \n\n<place>Anguillita Island</place>\n\n<place>Anguilla Arch</place>\n\n<place>Shoal Bay East</place>\n\nWell that's our list but we always recommend planning your own personal adventure. ",
+    "image": "https://cdn.stocksnap.io/img-thumbs/960w/diving-snorkel_ELADKTWHHU.jpg",
+    "subheadline": "Here are some of the best locations for some breathtaking underwater scenery",
     "tab": "activity",
     "tag": "Adventure",
-    "title": "Up For Some Snorkeling?!",
+    "title": "Up For Some Snorkelling?!",
+    "url": ""
+  },
+  {
+    "date": "2026-07-28",
+    "description": "Getting around Anguilla during your vacation can be pretty limiting or worse, it can get pretty expensive. It's always recommended to rent a vacation car from a local car rental agency whenever you can. Here are some of our recommendations when it comes time to planning your next vacation.\n<place>Andy's Auto Rentals</place>\n<place>Island Car Rental</place>\n<place>AVIS Rent A Car</place>\n\nWell that's our list. See you soon!",
+    "image": "https://www.anguilla-beaches.com/image-files/islandcarrental-toyota-fleet.jpg",
+    "subheadline": "Picking the right rental agency can be hard. Here are some helpful tips.",
+    "tab": "activity",
+    "tag": "Travel",
+    "title": "Need Help Getting Around?",
+    "url": ""
+  },
+  {
+    "date": "2026-08-22",
+    "description": "On an island of 33 white sand beaches , Anguilla isn't shy to the beach bar industry. Here's our list of our favourite beach bars to help with your next bar-hopping excursion\n<place>Elvis Beach Bar</place>\n<place>Love Shack Beach Club</place>\n<place>Da'Vida</place>\n<place>Leon's at Malliouhana</place>\n<place>Olas Tacos Bar & Grill</place>\n<place>Madeariman</place>\n<place>Elodias Beach Bar</place>\n\nThats our list and hopefully it can start your next Anguilla bar-hopping adventure - happy exploring.",
+    "image": "https://kahlaylae.github.io/RoamCMS/images/bar.jpg",
+    "subheadline": "Here's our top beach bars for any sunny afternoon beach day.",
+    "tab": "eat",
+    "tag": "",
+    "title": "White Sand Pinacoladas?",
     "url": ""
   }
 ]
