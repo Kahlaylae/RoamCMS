@@ -430,6 +430,24 @@
   .match-badge.auto { background: rgba(137, 180, 250, 0.2); color: var(--accent); }
   .match-badge.confirmed { background: rgba(166, 227, 161, 0.2); color: var(--success); }
   .match-badge.manual { background: rgba(249, 226, 175, 0.2); color: var(--warning); }
+  .match-badge.generic-badge { background: rgba(243, 139, 168, 0.2); color: #f38ba8; }
+  .match-badge.auto-flagged { background: rgba(148, 226, 213, 0.25); color: #94e2d5; }
+
+  /* Generic/placeholder warnings */
+  .match-row-generic { background: rgba(243, 139, 168, 0.06); }
+  .match-select.generic-select { border-color: #f38ba8; }
+  .match-preview.generic-preview { opacity: 0.4; filter: grayscale(0.5); }
+  .generic-warning {
+    padding: 8px 20px; margin: 0; font-size: 0.75rem;
+    background: rgba(243, 139, 168, 0.1); border-bottom: 1px solid rgba(243, 139, 168, 0.2);
+    color: var(--text-muted); line-height: 1.6;
+  }
+  .generic-warning strong { color: #f38ba8; }
+  .generic-pill {
+    display: inline-block; padding: 1px 8px; margin: 2px; border-radius: 10px;
+    background: rgba(243, 139, 168, 0.15); font-size: 0.7rem;
+    color: #f38ba8; white-space: nowrap;
+  }
 
   /* Match status bar */
   .match-stats {
@@ -2194,7 +2212,8 @@ document.addEventListener('click', function(e) {
 // ═══════════════════════════════════════════════════════════════
 //  AUTO-MATCH — match places to images by first 7 chars
 // ═══════════════════════════════════════════════════════════════
-let autoMatchData = {}; // title → { filename, source: 'auto'|'confirmed'|'manual' }
+let autoMatchData = {};       // title → { filename, source, originalImage, flagged? }
+let autoMatchGeneric = {};    // server-reported generic image stats
 
 async function openAutoMatch() {
   if (!currentData.length) return;
@@ -2212,28 +2231,45 @@ async function openAutoMatch() {
     });
     const data = await resp.json();
     autoMatchData = {};
+    autoMatchGeneric = {
+      images: data.generic_images || [],
+      counts: data.generic_counts || {},
+      flagged: data.flagged || {},
+    };
 
-    // Also load confirmed matches
-    const mResp = await fetch('/api/image-matches');
-    const confirmed = await mResp.json();
+    // The server already handles generic detection — matches[title] will be ''
+    // for places whose only match was a generic placeholder image.
+    // flagged[title] tells us exactly which ones got flagged and why.
 
     for (const title of titles) {
       const currentImg = (currentData.find(r => r.title === title) || {}).image || '';
       const autoImg = data.matches[title] || '';
-      const confirmedImg = confirmed[title] || '';
+      const isFlagged = !!data.flagged[title];
+      const flagInfo = data.flagged[title] || null;
 
       let source = 'none';
       let suggestedImg = currentImg || '';
 
-      if (confirmedImg) {
-        source = 'confirmed';
-        suggestedImg = confirmedImg;
+      if (isFlagged && autoImg) {
+        // Generic was replaced by a prefix match — show the new suggestion!
+        source = 'auto';
+        suggestedImg = autoImg;
+      } else if (isFlagged && !autoImg) {
+        // Generic placeholder with no replacement found yet
+        source = 'generic';
+        suggestedImg = currentImg; // keep current generic for now
       } else if (autoImg && !currentImg) {
         source = 'auto';
         suggestedImg = autoImg;
       } else if (autoImg && currentImg !== autoImg) {
         source = 'auto';
         suggestedImg = autoImg;
+      } else if (currentImg && !autoMatchGeneric.images.includes(currentImg)) {
+        source = 'confirmed';
+        suggestedImg = currentImg;
+      } else if (currentImg && autoMatchGeneric.images.includes(currentImg)) {
+        source = 'generic';
+        suggestedImg = currentImg;
       } else if (currentImg) {
         source = 'manual';
         suggestedImg = currentImg;
@@ -2243,6 +2279,8 @@ async function openAutoMatch() {
         filename: suggestedImg,
         source: source,
         originalImage: currentImg,
+        flagged: isFlagged,
+        flagInfo: flagInfo,
       };
     }
 
@@ -2256,23 +2294,45 @@ async function openAutoMatch() {
 function closeAutoMatch() {
   document.getElementById('autoMatchOverlay').classList.remove('visible');
   autoMatchData = {};
+  autoMatchGeneric = {};
 }
 
 async function renderAutoMatchModal() {
   const body = document.getElementById('autoMatchBody');
   const images = await loadImageList();
   const entries = Object.entries(autoMatchData);
+  const genericList = autoMatchGeneric.images || [];
+  const genericCounts = autoMatchGeneric.counts || {};
+  const flaggedInfo = autoMatchGeneric.flagged || {};
 
   // Stats
-  let autoCount = 0, confirmedCount = 0, emptyCount = 0;
+  let autoCount = 0, confirmedCount = 0, emptyCount = 0, genericCount = 0;
   entries.forEach(([_, v]) => {
     if (v.source === 'confirmed') confirmedCount++;
     else if (v.source === 'auto') autoCount++;
+    else if (v.source === 'generic') genericCount++;
     if (!v.originalImage && !v.filename) emptyCount++;
   });
+
+  // Generic image warning line
+  let genericWarning = '';
+  if (genericList.length > 0) {
+    const pills = genericList.map(img =>
+      '<span class="generic-pill" title="Used ' + (genericCounts[img] || '?') + ' times">⚠️ ' +
+      escapeHtml(img) + ' (' + (genericCounts[img] || '?') + '×)</span>'
+    ).join(' ');
+    genericWarning =
+      '<div class="generic-warning">' +
+      '<strong>🖼 Placeholder images detected:</strong> ' + pills +
+      '<br><small>These appear on 5+ places — auto-match will try to find real replacements.</small>' +
+      '</div>';
+  }
+
   document.getElementById('matchStats').innerHTML =
+    (genericWarning ? '' : '') +
     '<span>🔁 <strong>' + autoCount + '</strong> auto-suggested</span>' +
     '<span>✅ <strong>' + confirmedCount + '</strong> confirmed</span>' +
+    '<span>⚠️ <strong>' + genericCount + '</strong> using placeholders</span>' +
     '<span>📭 <strong>' + emptyCount + '</strong> still empty</span>';
 
   // Build image options <option> list
@@ -2280,21 +2340,35 @@ async function renderAutoMatchModal() {
     '<option value="' + escapeHtml(img) + '">' + escapeHtml(img) + '</option>'
   ).join('');
 
-  body.innerHTML = entries.map(([title, info]) => {
+  body.innerHTML = (genericWarning || '') + entries.map(([title, info]) => {
+    const isGeneric = info.source === 'generic';
     const badgeClass = info.source === 'confirmed' ? 'confirmed' :
-                       info.source === 'auto' ? 'auto' : 'manual';
+                       info.source === 'auto' && info.flagged ? 'auto-flagged' :
+                       info.source === 'auto' ? 'auto' :
+                       info.source === 'generic' ? 'generic-badge' : 'manual';
     const badgeText = info.source === 'confirmed' ? '✓ confirmed' :
+                      info.source === 'generic' ? '⚠ placeholder' :
+                      info.source === 'auto' && info.flagged ? '🔄 replaced' :
                       info.source === 'auto' ? '⟳ suggested' : '✎ manual';
     const selectClass = info.source === 'confirmed' ? 'matched' :
                         info.source === 'auto' && info.filename ? 'matched' :
+                        info.source === 'generic' ? 'generic-select' :
                         !info.filename ? 'unmatched' : '';
-    const previewSrc = info.filename ? '/images/' + info.filename : '';
+    const previewSrc = info.filename && !isGeneric ? '/images/' + info.filename : '';
+    // For generic images, show the old placeholder as preview but mark it
+    const oldPreviewSrc = isGeneric && info.originalImage ? '/images/' + info.originalImage : '';
 
-    return '<div class="match-row">' +
-      '<span class="match-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
+    const flagNote = info.flagged && info.flagInfo
+      ? ' <small style="color:var(--warning)">(was ' + escapeHtml(info.flagInfo.image) + ' — used ' + info.flagInfo.used_by + '×)</small>'
+      : '';
+
+    return '<div class="match-row' + (isGeneric ? ' match-row-generic' : '') + '">' +
+      '<span class="match-title" title="' + escapeHtml(title) + '">' + escapeHtml(title) + flagNote + '</span>' +
       '<span class="match-badge ' + badgeClass + '">' + badgeText + '</span>' +
       '<span class="match-arrow">→</span>' +
-      (previewSrc ? '<img class="match-preview" src="' + previewSrc + '" onerror="this.style.display=\'none\'" loading="lazy">' : '<span style="width:28px"></span>') +
+      (previewSrc ? '<img class="match-preview" src="' + previewSrc + '" onerror="this.style.display=\'none\'" loading="lazy">' :
+       oldPreviewSrc ? '<img class="match-preview generic-preview" src="' + oldPreviewSrc + '" onerror="this.style.display=\'none\'" loading="lazy" title="Placeholder image">' :
+       '<span style="width:28px"></span>') +
       '<select class="match-select ' + selectClass + '" data-title="' + escapeHtml(title).replace(/"/g, '&quot;') + '" onchange="onMatchSelectChange(this)">' +
         '<option value="">— no image —</option>' +
         imgOptions.replace('value="' + escapeHtml(info.filename) + '"', 'value="' + escapeHtml(info.filename) + '" selected') +

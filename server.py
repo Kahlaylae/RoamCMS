@@ -492,7 +492,7 @@ def api_auto_match():
     """Given a list of place titles, return suggested image matches.
 
     Matching rules (in priority order):
-    1. Existing confirmed match (from image-matches.json)
+    1. Existing confirmed match UNLESS it's a generic/placeholder image (used 5+ times)
     2. First ~7 alphanumeric chars of title match first ~7 of filename
     """
     body = request.get_json()
@@ -509,29 +509,65 @@ def api_auto_match():
                 images.append(f)
 
     confirmed = load_matches()
+
+    # ── Detect generic/placeholder images (used by too many places) ──
+    generic_images = set()
+    usage_count = {}
+    for img in confirmed.values():
+        usage_count[img] = usage_count.get(img, 0) + 1
+    for img, count in usage_count.items():
+        if count >= 5:
+            generic_images.add(img)
+
     matches = {}
+    flagged = {}  # title → reason it was flagged for re-check
 
     for title in titles:
         if not title or not isinstance(title, str):
             continue
 
-        # Rule 1: confirmed match
-        if title in confirmed:
-            matches[title] = confirmed[title]
+        confirmed_img = confirmed.get(title, '')
+
+        # Rule 1: confirmed match — BUT skip if it's a generic/placeholder image
+        if confirmed_img and confirmed_img not in generic_images:
+            matches[title] = confirmed_img
             continue
+
+        # If the confirmed image IS generic, flag it and try to find a real match
+        if confirmed_img and confirmed_img in generic_images:
+            flagged[title] = {
+                'reason': 'generic_image',
+                'image': confirmed_img,
+                'used_by': usage_count.get(confirmed_img, 0),
+            }
 
         # Rule 2: first ~7 alphanumeric chars
         prefix = ''.join(c.lower() for c in title if c.isalnum())[:7]
         if len(prefix) < 3:
+            matches[title] = matches.get(title, '')
             continue
 
         for img in images:
             img_prefix = ''.join(c.lower() for c in os.path.splitext(img)[0] if c.isalnum())[:7]
             if len(img_prefix) >= 3 and prefix == img_prefix:
                 matches[title] = img
+                if title in flagged:
+                    flagged[title]['new_match'] = img
+                    flagged[title]['reason'] = 'generic_replaced'
                 break
+        else:
+            # No prefix match found — keep the old generic match for now
+            if title in flagged and not matches.get(title):
+                matches[title] = ''
 
-    return jsonify({'matches': matches, 'total_titles': len(titles), 'total_matches': len(matches)})
+    return jsonify({
+        'matches': matches,
+        'total_titles': len(titles),
+        'total_matches': len(matches),
+        'flagged': flagged,
+        'generic_images': list(generic_images),
+        'generic_counts': {img: usage_count[img] for img in generic_images},
+    })
 
 
 @app.route('/images/<path:filename>')
