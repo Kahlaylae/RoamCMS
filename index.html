@@ -1129,7 +1129,7 @@ function highlightDescription(text) {
   let hasMatch = false;
 
   // 1. Place links: <place>NAME</place>
-  html = html.replace(/&lt;place&gt;([^&]+)&lt;\/place&gt;/gi, function(m, name) {
+  html = html.replace(/&lt;place&gt;(.+?)&lt;\/place&gt;/gi, function(m, name) {
     const rawName = unescapeHtml(name);
     const isValid = placeNames.has(rawName.toLowerCase());
     hasMatch = true;
